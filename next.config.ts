@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // ปิด cacheComponents: ทุกหน้าอ่าน session จาก database (Auth.js) จึง prerender ตอน build ไม่ได้
   turbopack: {
     rules: {
       "*.css": {
