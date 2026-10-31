@@ -1,0 +1,14 @@
+import 'dotenv/config'
+import { defineConfig, env } from 'prisma/config'
+
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  migrations: {
+    path: 'prisma/migrations',
+  },
+  // Prisma 7 config ใช้ URL เดียวสำหรับ CLI (migrate/studio) — ใช้ direct connection (port 5432)
+  // ส่วน runtime client ใช้ DATABASE_URL (pooler 6543) ผ่าน adapter ใน src/lib/prisma.ts
+  datasource: {
+    url: env('DIRECT_URL'),
+  },
+})
