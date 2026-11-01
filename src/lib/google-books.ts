@@ -3,21 +3,9 @@
  * ทุกฟังก์ชันเรียกจากฝั่ง server เท่านั้น (ซ่อน API key)
  */
 
-export type NormalizedBook = {
-  googleBooksId: string | null;
-  title: string;
-  subtitle: string | null;
-  authors: string[];
-  categories: string[];
-  isbn10: string | null;
-  isbn13: string | null;
-  coverUrl: string | null;
-  publisher: string | null;
-  publishedDate: string | null;
-  description: string | null;
-  pageCount: number | null;
-  language: string | null;
-};
+import type { NormalizedBook } from "@/lib/book-types";
+
+export type { NormalizedBook };
 
 export class BooksApiError extends Error {
   status: number;

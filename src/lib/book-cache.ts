@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { NormalizedBook } from "@/lib/google-books";
+import type { NormalizedBook } from "@/lib/book-types";
 
 /**
  * Book table = cache กลาง — คนที่สองค้นเล่มเดิมไม่ต้องยิง Google Books ซ้ำ
@@ -74,8 +74,4 @@ export async function createManualBook(
   });
 }
 
-/** index 0-5 สำหรับเลือกสี gradient ของปก placeholder จากตัวอักษรแรกของชื่อเรื่อง */
-export function coverPlaceholder(title: string): number {
-  const first = title.trim().charCodeAt(0) || 0;
-  return first % 6;
-}
+export { coverPlaceholder } from "@/lib/cover";
