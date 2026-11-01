@@ -12,27 +12,24 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const LINKS = [
-  { href: "/", label: "หน้าหลัก" },
-  { href: "/search", label: "ค้นหา" },
-  { href: "/shelf", label: "ชั้นของฉัน" },
-];
+import { LanguageToggle } from "@/components/language-toggle";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 
 function ThemeToggle() {
   const { setTheme } = useTheme();
+  const { t } = useI18n();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="เปลี่ยนธีม">
+        <Button variant="ghost" size="icon" aria-label={t.nav.themeToggle}>
           <Sun className="h-4 w-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
           <Moon className="absolute h-4 w-4 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>สว่าง</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>มืด</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>ตามระบบ</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("light")}>{t.nav.themeLight}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>{t.nav.themeDark}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>{t.nav.themeSystem}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -40,6 +37,13 @@ function ThemeToggle() {
 
 export function NavBar({ user }: { user: { name?: string | null; image?: string | null } | null }) {
   const pathname = usePathname();
+  const { t } = useI18n();
+
+  const links = [
+    { href: "/", label: t.nav.home },
+    { href: "/search", label: t.nav.search },
+    { href: "/shelf", label: t.nav.shelf },
+  ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
@@ -48,7 +52,7 @@ export function NavBar({ user }: { user: { name?: string | null; image?: string 
           MyShelf
         </Link>
         <nav className="flex items-center gap-1">
-          {LINKS.map((link) => (
+          {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
@@ -63,11 +67,12 @@ export function NavBar({ user }: { user: { name?: string | null; image?: string 
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-1">
+          <LanguageToggle />
           <ThemeToggle />
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-full focus:outline-none" aria-label="เมนูบัญชี">
+                <button className="flex items-center gap-2 rounded-full focus:outline-none" aria-label={t.nav.accountMenu}>
                   {user.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={user.image} alt="" className="h-8 w-8 rounded-full" referrerPolicy="no-referrer" />
@@ -80,7 +85,7 @@ export function NavBar({ user }: { user: { name?: string | null; image?: string 
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/signin" })}>
-                  <LogOut className="h-4 w-4" /> ออกจากระบบ
+                  <LogOut className="h-4 w-4" /> {t.nav.signOut}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
