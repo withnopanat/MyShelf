@@ -1,19 +1,29 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { dictionaries, getLocale } from "@/lib/i18n";
+import { prisma } from "@/lib/prisma";
+import { BOOK_STATUSES } from "@/lib/book-status";
+import { ScanPanel } from "@/components/scan-panel";
+import { ShelfSummary } from "@/components/shelf-summary";
 
 export default async function Home() {
-  const [session, locale] = await Promise.all([auth(), getLocale()]);
+  const session = await auth();
   if (!session?.user) redirect("/signin");
-  const t = dictionaries[locale];
+  const userId = session.user.id;
 
-  // หน้าแรกจริง (สแกน ISBN + สรุปชั้น) มาใน Task 11 — ขั้นนี้เป็น placeholder
+  const counts = await prisma.shelfItem.groupBy({
+    by: ["status"],
+    where: { userId },
+    _count: { _all: true },
+  });
+  const countByStatus = Object.fromEntries(
+    BOOK_STATUSES.map((s) => [s, counts.find((c) => c.status === s)?._count._all ?? 0]),
+  );
+  const total = Object.values(countByStatus).reduce((a, b) => a + b, 0);
+
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">
-        {t.home.greeting.replace("{name}", session.user.name ?? "ผู้ใช้")}
-      </h1>
-      <p className="mt-2 text-muted-foreground">{t.home.comingSoon}</p>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
+      <ShelfSummary total={total} countByStatus={countByStatus} />
+      <ScanPanel />
     </div>
   );
 }
