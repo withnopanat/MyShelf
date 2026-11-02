@@ -1,21 +1,47 @@
 /**
- * ดึงปก/คำอธิบายจากร้านหนังสือไทยที่ใช้ WooCommerce (มี Store API สาธารณะ)
- * — ปกฉบับแปลไทยไม่มีบน Google Books แต่สำนักพิมพ์/ร้านไทยมักมีในเว็บตัวเอง
- * เพิ่มร้านใหม่: ใส่ base URL ของเว็บที่รัน WooCommerce ลงใน WOOCOMMERCE_STORES
+ * ดึงปก/คำอธิบายจากร้านหนังสือไทย 2 แบบ:
+ * 1. WooCommerce Store API (สาธารณะ, ค้นตรง)      — เช่น salmonbooks.net
+ * 2. Sitemap crawl (ร้านที่ product page มี og:image แต่ค้นด้วย JS) — เช่น Library House
+ *    crawl sitemap ครั้งเดียวแล้ว cache 7 วัน
+ * เพิ่มร้านใหม่: เติม URL ใน WOOCOMMERCE_STORES หรือ SITEMAP_STORES
  */
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
 export const WOOCOMMERCE_STORES = ["https://salmonbooks.net"];
+export const SITEMAP_STORES = ["https://shop.libraryhousebangkok.com"];
 
-type WooProduct = {
-  name?: string;
-  sku?: string;
-  images?: Array<{ src?: string; thumbnail?: string }>;
-  description?: string;
-  short_description?: string;
-};
+const CRAWL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const CRAWL_CONCURRENCY = 8;
+
+type CatalogEntry = { title: string; coverUrl: string; isbn: string | null };
+type SitemapStore = { base: string; entries: CatalogEntry[]; fetchedAt: number };
+const sitemapCache = new Map<string, SitemapStore>();
+
+export function clearSitemapCache(): void {
+  sitemapCache.clear();
+}
+
+async function fetchText(url: string, timeoutMs: number): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, Accept: "text/html,application/xml,application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res.ok ? await res.text() : null;
+  } catch {
+    return null;
+  }
+}
+
+function meta(html: string, property: string): string | null {
+  return (
+    html.match(new RegExp(`property=["']${property}["'][^>]+content=["']([^"']+)["']`, "i"))?.[1] ??
+    html.match(new RegExp(`content=["']([^"']+)["'][^>]+property=["']${property}["']`, "i"))?.[1] ??
+    null
+  );
+}
 
 function stripHtml(html: string): string {
   return html
@@ -25,40 +51,119 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-/** ดึงปก (thumbnail) + คำอธิบายจากร้าน WooCommerce — ไม่เจอ/ล่ม → null */
-export async function scrapeThaiCover(
+// ── 1) WooCommerce Store API ────────────────────────────────────────
+
+type WooProduct = {
+  name?: string;
+  sku?: string;
+  images?: Array<{ src?: string; thumbnail?: string }>;
+  description?: string;
+  short_description?: string;
+};
+
+async function scrapeWooCommerce(
+  base: string,
   input: { isbn13?: string | null; title: string },
-  stores: string[] = WOOCOMMERCE_STORES,
 ): Promise<{ coverUrl: string; description: string | null } | null> {
   const query = input.isbn13 || input.title;
+  const text = await fetchText(
+    `${base}/wp-json/wc/store/v1/products?search=${encodeURIComponent(query)}&per_page=5`,
+    8000,
+  );
+  if (!text) return null;
 
-  for (const base of stores) {
-    try {
-      const url = `${base}/wp-json/wc/store/v1/products?search=${encodeURIComponent(query)}&per_page=5`;
-      const res = await fetch(url, {
-        headers: { "User-Agent": UA, Accept: "application/json" },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!res.ok) continue;
-      const items = (await res.json()) as WooProduct[];
-      if (!Array.isArray(items) || items.length === 0) continue;
+  let items: WooProduct[];
+  try {
+    items = JSON.parse(text) as WooProduct[];
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(items) || items.length === 0) return null;
 
-      // เลือกเล่มที่ sku ตรง ISBN ก่อน แล้วค่อยตัวแรกสุด
-      const product =
-        (input.isbn13 ? items.find((p) => (p.sku ?? "").replace(/-/g, "") === input.isbn13) : undefined) ?? items[0];
+  const product =
+    (input.isbn13 ? items.find((p) => (p.sku ?? "").replace(/-/g, "") === input.isbn13) : undefined) ?? items[0];
 
-      const coverUrl = product.images?.[0]?.thumbnail ?? product.images?.[0]?.src;
-      const rawDescription = product.description ?? product.short_description ?? "";
-      const description = stripHtml(rawDescription);
+  const coverUrl = product.images?.[0]?.thumbnail ?? product.images?.[0]?.src;
+  const description = stripHtml(product.description ?? product.short_description ?? "");
+  if (!coverUrl && !description) return null;
+  return { coverUrl: coverUrl ?? "", description: description || null };
+}
 
-      if (!coverUrl && !description) continue;
-      return {
-        coverUrl: coverUrl ?? "",
-        description: description || null,
-      };
-    } catch {
-      continue; // ร้านล่ม/block = ข้าม ไปร้านถัดไป
-    }
+// ── 2) Sitemap crawl (ร้าน JS-render) ───────────────────────────────
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += limit) {
+    results.push(...(await Promise.all(items.slice(i, i + limit).map(fn))));
+  }
+  return results;
+}
+
+async function crawlSitemapStore(base: string): Promise<CatalogEntry[]> {
+  const cached = sitemapCache.get(base);
+  if (cached && Date.now() - cached.fetchedAt < CRAWL_TTL_MS) return cached.entries;
+
+  const sitemap = await fetchText(`${base}/sitemap.xml`, 10000);
+  if (!sitemap) throw new Error("sitemap unavailable");
+  const productUrls = [...new Set([...sitemap.matchAll(/<loc>([^<]+)<\/loc>/gi)].map((m) => m[1]))].filter((l) =>
+    /\/product\//.test(l),
+  );
+
+  const entries: CatalogEntry[] = [];
+  const pages = await mapLimit(productUrls, CRAWL_CONCURRENCY, async (url) => fetchText(url, 8000));
+  for (const page of pages) {
+    if (!page) continue;
+    const title = meta(page, "og:title");
+    const image = meta(page, "og:image");
+    if (!title || !image) continue;
+    const isbn = page.match(/97[89]\d{10}/)?.[0] ?? null;
+    entries.push({ title, coverUrl: image, isbn });
+  }
+
+  sitemapCache.set(base, { base, entries, fetchedAt: Date.now() });
+  return entries;
+}
+
+function titleMatches(ogTitle: string, query: string): boolean {
+  const og = ogTitle.toLowerCase();
+  const q = query.toLowerCase();
+  if (og.includes(q) || q.includes(og)) return true;
+  // ทุกคำภาษาละตินของ query (ยาว > 2) ต้องอยู่ใน og:title
+  const latinWords = q.match(/[a-z]{3,}/g) ?? [];
+  return latinWords.length > 0 && latinWords.every((w) => og.includes(w));
+}
+
+async function scrapeSitemapStore(
+  base: string,
+  input: { isbn13?: string | null; title: string },
+): Promise<{ coverUrl: string } | null> {
+  let entries: CatalogEntry[];
+  try {
+    entries = await crawlSitemapStore(base);
+  } catch {
+    return null;
+  }
+
+  const match =
+    (input.isbn13 ? entries.find((e) => e.isbn === input.isbn13) : undefined) ??
+    entries.find((e) => titleMatches(e.title, input.title));
+  return match ? { coverUrl: match.coverUrl } : null;
+}
+
+// ── public ──────────────────────────────────────────────────────────
+
+export async function scrapeThaiCover(
+  input: { isbn13?: string | null; title: string },
+  wooStores: string[] = WOOCOMMERCE_STORES,
+  sitemapStores: string[] = SITEMAP_STORES,
+): Promise<{ coverUrl: string; description: string | null } | null> {
+  for (const base of wooStores) {
+    const r = await scrapeWooCommerce(base, input);
+    if (r) return r;
+  }
+  for (const base of sitemapStores) {
+    const r = await scrapeSitemapStore(base, input);
+    if (r) return { coverUrl: r.coverUrl, description: null };
   }
   return null;
 }
