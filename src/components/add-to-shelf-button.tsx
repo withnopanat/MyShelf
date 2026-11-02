@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { addToShelf } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { apiErrorMessage } from "@/lib/api-error";
 import { BOOK_STATUSES } from "@/lib/book-status";
 import type { NormalizedBook } from "@/lib/book-types";
 import type { BookStatus } from "@/generated/prisma/client";
@@ -35,7 +36,7 @@ export function AddToShelfButton({
       toast.success(t.common.added);
       onAdded?.(status);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t.errors.generic);
+      toast.error(apiErrorMessage(error, t.errors));
     } finally {
       setPending(false);
     }

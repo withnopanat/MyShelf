@@ -28,6 +28,7 @@ import { BookDetailModal } from "@/components/book-detail-modal";
 import { ManualBookForm } from "@/components/manual-book-form";
 import { deleteShelfItem, updateShelfItem, type ShelfItem } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { apiErrorMessage } from "@/lib/api-error";
 import { BOOK_STATUSES, STATUS_COLORS } from "@/lib/book-status";
 import type { BookStatus } from "@/generated/prisma/client";
 import { cn } from "@/lib/utils";
@@ -62,7 +63,7 @@ export function ShelfClient({
       await updateShelfItem(item.id, { status });
       startTransition(() => router.refresh());
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t.errors.generic);
+      toast.error(apiErrorMessage(error, t.errors));
     }
   };
 
@@ -74,7 +75,7 @@ export function ShelfClient({
       setToRemove(null);
       startTransition(() => router.refresh());
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t.errors.generic);
+      toast.error(apiErrorMessage(error, t.errors));
       setToRemove(null);
     }
   };

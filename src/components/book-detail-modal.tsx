@@ -15,6 +15,7 @@ import { BookCover } from "@/components/book-cover";
 import { TagEditor } from "@/components/tag-editor";
 import { updateShelfItem, apiPatch, type ShelfItem } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { apiErrorMessage } from "@/lib/api-error";
 import { BOOK_STATUSES, STATUS_COLORS } from "@/lib/book-status";
 import type { BookStatus } from "@/generated/prisma/client";
 import { cn } from "@/lib/utils";
@@ -43,7 +44,7 @@ export function BookDetailModal({ item, open, onOpenChange, onItemChanged, onRem
       toast.success(t.common.saved);
       onItemChanged?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t.errors.generic);
+      toast.error(apiErrorMessage(error, t.errors));
     }
   };
 
@@ -51,7 +52,7 @@ export function BookDetailModal({ item, open, onOpenChange, onItemChanged, onRem
     try {
       await updateShelfItem(item.id, { tags: next });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t.errors.generic);
+      toast.error(apiErrorMessage(error, t.errors));
     }
   };
 
@@ -62,7 +63,7 @@ export function BookDetailModal({ item, open, onOpenChange, onItemChanged, onRem
       toast.success(t.common.saved);
       onItemChanged?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t.errors.generic);
+      toast.error(apiErrorMessage(error, t.errors));
     }
   };
 

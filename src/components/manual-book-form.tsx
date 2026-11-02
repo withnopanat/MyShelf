@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiPost } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { apiErrorMessage } from "@/lib/api-error";
 import { BOOK_STATUSES } from "@/lib/book-status";
 import type { BookStatus } from "@/generated/prisma/client";
 
@@ -64,7 +65,7 @@ export function ManualBookForm({
       setIsbn13(defaultIsbn ?? "");
       onCreated?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t.errors.generic);
+      toast.error(apiErrorMessage(error, t.errors));
     } finally {
       setSaving(false);
     }

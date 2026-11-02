@@ -16,6 +16,7 @@ import { AddToShelfButton } from "@/components/add-to-shelf-button";
 import { EmptyState } from "@/components/empty-state";
 import { searchBooksClient, fetchShelf } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { apiErrorMessage } from "@/lib/api-error";
 import type { NormalizedBook } from "@/lib/book-types";
 import type { BookStatus } from "@/generated/prisma/client";
 
@@ -61,7 +62,7 @@ export function SearchClient() {
         setResults([]);
         setSearched(true);
         import("sonner").then(({ toast }) =>
-          toast.error(error instanceof Error ? error.message : t.errors.searchFailed),
+          toast.error(apiErrorMessage(error, t.errors)),
         );
       } finally {
         setLoading(false);

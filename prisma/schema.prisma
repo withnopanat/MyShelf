@@ -12,7 +12,7 @@ datasource db {
 
 model User {
   id            String      @id @default(cuid())
-  googleId      String      @unique
+  googleId      String?     @unique // nullable: Auth.js adapter create user ก่อน แล้ว backfill ใน events.signIn
   email         String      @unique
   name          String?
   image         String?

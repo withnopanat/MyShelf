@@ -13,11 +13,12 @@ import { ManualBookForm } from "@/components/manual-book-form";
 import { apiGet } from "@/lib/api-client";
 import { isBarcodeSupported, startScan } from "@/lib/barcode";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { apiErrorMessage } from "@/lib/api-error";
 import type { NormalizedBook } from "@/lib/book-types";
 import type { BookStatus } from "@/generated/prisma/client";
 
 type LookupResult =
-  | { kind: "on-shelf"; item: { id: string; status: BookStatus }; book: NormalizedBook }
+  | { kind: "on-shelf"; item: { id: string; status: BookStatus; book: { title: string } }; book: NormalizedBook | null }
   | { kind: "available"; book: NormalizedBook }
   | { kind: "not-found"; isbn: string };
 
@@ -42,34 +43,30 @@ export function ScanPanel() {
     setResult(null);
     setChecking(true);
     try {
-      // ดูก่อนว่ามีบนชั้นไหม (จาก cache) แล้วค่อยเรียก Google Books
-      const data = await apiGet<{ book: NormalizedBook | null }>(
-        `/api/books/isbn/${encodeURIComponent(isbn)}`,
-        t.errors.searchFailed,
-      );
-      if (!data.book) {
-        setResult({ kind: "not-found", isbn });
+      // server เช็กชั้นก่อน (ครอบ manual book ด้วย) แล้วยิง Google Books — รวมใน response เดียว
+      const data = await apiGet<{
+        book: NormalizedBook | null;
+        shelfItem: { id: string; status: BookStatus; book: { title: string } } | null;
+      }>(`/api/books/isbn/${encodeURIComponent(isbn)}`, t.errors.searchFailed);
+
+      if (data.shelfItem) {
+        setResult({ kind: "on-shelf", item: data.shelfItem, book: data.book });
         return;
       }
-      const shelf = await apiGet<{ items: Array<{ id: string; status: BookStatus; book: { googleBooksId: string | null } }> }>(
-        "/api/shelf",
-      );
-      const match = data.book.googleBooksId
-        ? shelf.items.find((i) => i.book.googleBooksId === data.book!.googleBooksId)
-        : undefined;
-      setResult(
-        match
-          ? { kind: "on-shelf", item: { id: match.id, status: match.status }, book: data.book }
-          : { kind: "available", book: data.book },
-      );
+      if (data.book) {
+        setResult({ kind: "available", book: data.book });
+        return;
+      }
+      setResult({ kind: "not-found", isbn });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t.errors.generic);
+      toast.error(apiErrorMessage(error, t.errors));
     } finally {
       setChecking(false);
     }
   };
 
   const beginScan = () => {
+    // <video> ถูก render ไว้เสมอ (ซ่อนตอนไม่สแกน) — ref จึงมีค่าตอนกดปุ่ม
     if (!videoRef.current) return;
     setScanning(true);
     stopRef.current = startScan(
@@ -105,10 +102,16 @@ export function ScanPanel() {
         {t.home.scanButton}
       </h2>
 
+      <video
+        ref={videoRef}
+        className={scanning ? "mt-4 w-full max-w-sm rounded-lg" : "hidden"}
+        playsInline
+        muted
+      />
+
       {scanning && (
         <div className="mt-4">
-          <video ref={videoRef} className="w-full max-w-sm rounded-lg" playsInline muted />
-          <p className="mt-2 text-sm text-muted-foreground">{t.home.scanning}</p>
+          <p className="text-sm text-muted-foreground">{t.home.scanning}</p>
           <Button variant="outline" className="mt-2" onClick={stop}>
             {t.home.stopScan}
           </Button>
@@ -141,7 +144,29 @@ export function ScanPanel() {
         ) : result?.kind === "on-shelf" ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex-1">
-              <BookCard book={result.book} onShelfStatus={result.item.status} />
+              {result.book ? (
+                <BookCard book={result.book} onShelfStatus={result.item.status} />
+              ) : (
+                // manual book — ไม่มีข้อมูลจาก Google แสดงจากข้อมูลในชั้น
+                <BookCard
+                  book={{
+                    googleBooksId: null,
+                    title: result.item.book.title,
+                    subtitle: null,
+                    authors: [],
+                    categories: [],
+                    isbn10: null,
+                    isbn13: null,
+                    coverUrl: null,
+                    publisher: null,
+                    publishedDate: null,
+                    description: null,
+                    pageCount: null,
+                    language: null,
+                  }}
+                  onShelfStatus={result.item.status}
+                />
+              )}
             </div>
             <Button variant="outline" asChild>
               <a href="/shelf">{t.home.goShelf}</a>

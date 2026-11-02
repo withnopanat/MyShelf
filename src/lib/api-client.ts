@@ -31,8 +31,10 @@ async function request<T>(input: string, init: RequestInit, fallbackError: strin
   if (res.status === 204) return undefined as T;
   const body = (await res.json().catch(() => null)) as { error?: string } | null;
   if (!res.ok) {
-    const error = new Error(body?.error ?? fallbackError);
+    // ข้อความจาก server (ไทย) แสดงตรง ๆ; ถ้าไม่มี แนบ fallbackKey ให้ UI แปลงตาม locale
+    const error = new Error(body?.error ?? fallbackError) as Error & { fallbackKey?: string };
     error.name = "ApiError";
+    if (!body?.error) error.fallbackKey = fallbackError;
     throw error;
   }
   return body as T;
