@@ -4,6 +4,7 @@
  */
 
 import type { NormalizedBook } from "@/lib/book-types";
+import { scrapeThaiCover } from "@/lib/thai-covers";
 
 export type { NormalizedBook };
 
@@ -202,13 +203,28 @@ export async function enrichFromOtherEditions(nb: NormalizedBook): Promise<Norma
   // เลือกฉบับที่มีปกเป็นอันดับแรก (ให้ฉบับภาษาอังกฤษน้ำหนักกว่าเล็กน้อย)
   const donor =
     volumes.find((v) => v.coverUrl && v.language === "en") ?? volumes.find((v) => v.coverUrl);
-  if (!donor) return nb;
 
-  return {
-    ...nb,
-    coverUrl: nb.coverUrl ?? donor.coverUrl,
-    description: nb.description ?? donor.description,
-    pageCount: nb.pageCount ?? donor.pageCount,
-    publisher: nb.publisher ?? donor.publisher,
-  };
+  let merged: NormalizedBook = donor
+    ? {
+        ...nb,
+        coverUrl: nb.coverUrl ?? donor.coverUrl,
+        description: nb.description ?? donor.description,
+        pageCount: nb.pageCount ?? donor.pageCount,
+        publisher: nb.publisher ?? donor.publisher,
+      }
+    : nb;
+
+  // ยังขาดปกหรือคำอธิบาย → ลองร้านไทย (ปก+คำอธิบายไทยจาก WooCommerce)
+  if (!merged.coverUrl || !merged.description) {
+    const thai = await scrapeThaiCover({ isbn13: nb.isbn13, title: nb.title });
+    if (thai) {
+      merged = {
+        ...merged,
+        coverUrl: merged.coverUrl || thai.coverUrl || null,
+        description: merged.description ?? thai.description,
+      };
+    }
+  }
+
+  return merged;
 }

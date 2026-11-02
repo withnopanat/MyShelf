@@ -125,11 +125,46 @@ describe("enrichFromOtherEditions", () => {
     expect(url.searchParams.get("q")).toContain("intitle:");
   });
 
-  it("ทุกฉบับไม่มีปก → คืนข้อมูลเดิม ไม่ throw", async () => {
+  it("ทุกฉบับไม่มีปก → ลองหาร้านไทย (WooCommerce) แล้วเอาปก+คำอธิบายไทยมาเติม", async () => {
+    // ครั้งที่ 1: enrich จากฉบับอื่น (ไม่เจอปก)
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    // ครั้งที่ 2: ร้านไทย (WooCommerce Store API)
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([
+          {
+            name: "THE SEVEN YEAR SLIP รักนี้เมื่อเจ็บปีที่แล้ว",
+            sku: "9786162986864",
+            images: [{ src: "https://store.example/cover-600.png", thumbnail: "https://store.example/cover-300.png" }],
+            description: "<p>เรื่องราว&#8216;ความรัก&#8217;ข้ามเวลา</p>",
+          },
+        ]),
+        { status: 200 },
+      ),
+    );
+    const result = await enrichFromOtherEditions({ ...baseBook });
+    expect(result.coverUrl).toBe("https://store.example/cover-300.png");
+    // HTML tag และ numeric entity ต้องถูก strip หมด
+    expect(result.description).toBe("เรื่องราว ความรัก ข้ามเวลา");
+    // URL ที่ยิงต้องเป็น WooCommerce Store API ค้นด้วย ISBN
+    const storeUrl = new URL(fetchMock.mock.calls[1][0] as string);
+    expect(storeUrl.pathname).toContain("/wp-json/wc/store/v1/products");
+    expect(storeUrl.searchParams.get("search")).toBe("9786162986864");
+  });
+
+  it("ร้านไทยก็ไม่มี → คืนข้อมูลเดิม ไม่ throw", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
     const result = await enrichFromOtherEditions({ ...baseBook });
     expect(result.coverUrl).toBeNull();
-    expect(result.title).toBe(baseBook.title);
+    expect(result.description).toBeNull();
+  });
+
+  it("ร้านไทยล่ม (fetch throw) → คืนข้อมูลเดิม ไม่ throw", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    const result = await enrichFromOtherEditions({ ...baseBook });
+    expect(result.coverUrl).toBeNull();
   });
 });
 
