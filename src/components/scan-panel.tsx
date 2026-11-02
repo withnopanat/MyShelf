@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { BookCard } from "@/components/book-card";
 import { AddToShelfButton } from "@/components/add-to-shelf-button";
 import { EmptyState } from "@/components/empty-state";
+import { ManualBookForm } from "@/components/manual-book-form";
 import { apiGet } from "@/lib/api-client";
 import { isBarcodeSupported, startScan } from "@/lib/barcode";
 import { useI18n } from "@/lib/i18n/i18n-provider";
@@ -30,6 +31,7 @@ export function ScanPanel() {
   const [isbnInput, setIsbnInput] = useState("");
   const [result, setResult] = useState<LookupResult | null>(null);
   const [checking, setChecking] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
 
   useEffect(() => {
     setSupported(isBarcodeSupported());
@@ -160,10 +162,23 @@ export function ScanPanel() {
             />
           </div>
         ) : result?.kind === "not-found" ? (
-          <EmptyState
-            title={t.home.notFound}
-            description={result.isbn}
-          />
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-8">
+            <p className="text-base font-medium">{t.home.notFound}</p>
+            <p className="text-sm text-muted-foreground">{result.isbn}</p>
+            <Button variant="outline" size="sm" onClick={() => setManualOpen(true)}>
+              {t.home.addManual}
+            </Button>
+            <ManualBookForm
+              open={manualOpen}
+              onOpenChange={setManualOpen}
+              defaultIsbn={result.isbn}
+              onCreated={() => {
+                setResult(null);
+                setIsbnInput("");
+                router.refresh();
+              }}
+            />
+          </div>
         ) : null}
       </div>
     </section>
