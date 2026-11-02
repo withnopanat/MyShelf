@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { searchBooks, BooksApiError } from "@/lib/google-books";
+import { searchBooks, enrichFromOtherEditions, BooksApiError } from "@/lib/google-books";
 import { requireUserId, UnauthorizedError } from "@/lib/session";
 
 const TYPES = ["text", "author", "category", "isbn"] as const;
@@ -21,6 +21,18 @@ export async function GET(request: Request) {
     }
 
     const books = await searchBooks({ q, type: typeParam as SearchType });
+
+    // เติมปกให้เล่มที่ Google ไม่มีรูป (ฉบับแปลไทยมักโดน) — จำกัด 3 เล่ม/ครั้ง ป้องกันกิน quota
+    const coverless = books.filter((b) => !b.coverUrl).slice(0, 3);
+    if (coverless.length > 0) {
+      const enriched = await Promise.all(coverless.map((b) => enrichFromOtherEditions(b)));
+      const byId = new Map(enriched.map((b) => [b.googleBooksId, b]));
+      for (let i = 0; i < books.length; i++) {
+        const replacement = byId.get(books[i].googleBooksId);
+        if (replacement) books[i] = replacement;
+      }
+    }
+
     return NextResponse.json({ books });
   } catch (error) {
     if (error instanceof UnauthorizedError) {

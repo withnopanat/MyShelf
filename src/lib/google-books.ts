@@ -151,8 +151,12 @@ export async function lookupIsbn(rawIsbn: string): Promise<NormalizedBook | null
   let book = results[0] ?? null;
   if (!book) return null;
   if (!book.coverUrl) {
-    const fallback = await enrichCover(normalized);
-    if (fallback) book = { ...book, coverUrl: fallback };
+    // เรื่องเดียวกันฉบับอื่นก่อน แล้วค่อยลอง OpenLibrary
+    book = await enrichFromOtherEditions(book);
+    if (!book.coverUrl) {
+      const fallback = await enrichCover(normalized);
+      if (fallback) book = { ...book, coverUrl: fallback };
+    }
   }
   return book;
 }
@@ -169,4 +173,42 @@ export async function enrichCover(isbn: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * เติม field ที่ขาด (ปก/คำอธิบาย/จำนวนหน้า) จาก "ฉบับพิมพ์อื่น" ของเรื่องเดียวกัน
+ * — ฉบับแปลไทยบน Google Books มักไม่มีปก แต่ฉบับต้นฉบับมักมี
+ * ถ้ามีปกและคำอธิบายครบอยู่แล้วจะไม่ยิง API (ประหยัด quota)
+ */
+export async function enrichFromOtherEditions(nb: NormalizedBook): Promise<NormalizedBook> {
+  if (nb.coverUrl && nb.description) return nb;
+
+  let data: { items?: unknown[] };
+  try {
+    const url = new URL(BOOKS_API);
+    url.searchParams.set("q", `intitle:"${nb.title}"`);
+    url.searchParams.set("maxResults", "10");
+    const key = process.env.GOOGLE_BOOKS_API_KEY;
+    if (key) url.searchParams.set("key", key);
+    data = (await callGoogleBooks(url.toString())) as { items?: unknown[] };
+  } catch {
+    return nb; // enrich ไม่สำเร็จ = ใช้ข้อมูลเดิม ไม่ throw
+  }
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  const volumes = items
+    .map(normalizeVolume)
+    .filter((v): v is NormalizedBook => v !== null);
+  // เลือกฉบับที่มีปกเป็นอันดับแรก (ให้ฉบับภาษาอังกฤษน้ำหนักกว่าเล็กน้อย)
+  const donor =
+    volumes.find((v) => v.coverUrl && v.language === "en") ?? volumes.find((v) => v.coverUrl);
+  if (!donor) return nb;
+
+  return {
+    ...nb,
+    coverUrl: nb.coverUrl ?? donor.coverUrl,
+    description: nb.description ?? donor.description,
+    pageCount: nb.pageCount ?? donor.pageCount,
+    publisher: nb.publisher ?? donor.publisher,
+  };
 }

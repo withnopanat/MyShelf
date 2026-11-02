@@ -1,10 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { normalizeIsbn, isbn10To13, normalizeVolume, searchBooks, BooksApiError } from "@/lib/google-books";
+import { normalizeIsbn, isbn10To13, normalizeVolume, searchBooks, enrichFromOtherEditions, BooksApiError, type NormalizedBook } from "@/lib/google-books";
 import fixture from "@/lib/__fixtures__/google-volume.json";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 afterEach(() => fetchMock.mockReset());
+
+const baseBook: NormalizedBook = {
+  googleBooksId: "th-edition",
+  title: "The seven year slip รักนี้เมื่อเจ็บปีที่แล้ว",
+  subtitle: null,
+  authors: ["Ashley Poston"],
+  categories: [],
+  isbn10: "6162986861",
+  isbn13: "9786162986864",
+  coverUrl: null,
+  publisher: "นานมีบุ๊คส์",
+  publishedDate: "2026",
+  description: null,
+  pageCount: null,
+  language: "th",
+};
 
 describe("normalizeIsbn", () => {
   it("ตัดขีดและช่องว่างออกจาก ISBN-13 ที่ถูกต้อง", () => {
@@ -66,6 +82,54 @@ describe("normalizeVolume", () => {
   it("volume ไม่มี title → null", () => {
     expect(normalizeVolume({ id: "x", volumeInfo: {} })).toBeNull();
     expect(normalizeVolume("not an object")).toBeNull();
+  });
+});
+
+describe("enrichFromOtherEditions", () => {
+  it("มีปกและคำอธิบายครบ → ไม่ยิง API เพิ่ม", async () => {
+    const complete: NormalizedBook = { ...baseBook, coverUrl: "https://x/c.jpg", description: "มีคำอธิบาย" };
+    const result = await enrichFromOtherEditions(complete);
+    expect(result).toEqual(complete);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("ไม่มีปก → ดึงปกจากฉบับอื่นของเรื่องเดียวกัน", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [
+            { volumeInfo: { title: "ฉบับไทย", language: "th" } }, // ไม่มีปก — ข้าม
+            {
+              id: "en-edition",
+              volumeInfo: {
+                title: "The Seven Year Slip",
+                language: "en",
+                imageLinks: { thumbnail: "http://books.google.com/books/content?id=en&img=1" },
+                pageCount: 352,
+                description: "A magical romance",
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const result = await enrichFromOtherEditions({ ...baseBook });
+    expect(result.coverUrl).toBe("https://books.google.com/books/content?id=en&img=1");
+    expect(result.pageCount).toBe(352);
+    expect(result.description).toBe("A magical romance");
+    // field เดิมที่มีอยู่แล้วต้องไม่ถูกแทนที่
+    expect(result.title).toBe(baseBook.title);
+    expect(result.authors).toEqual(baseBook.authors);
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.searchParams.get("q")).toContain("intitle:");
+  });
+
+  it("ทุกฉบับไม่มีปก → คืนข้อมูลเดิม ไม่ throw", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    const result = await enrichFromOtherEditions({ ...baseBook });
+    expect(result.coverUrl).toBeNull();
+    expect(result.title).toBe(baseBook.title);
   });
 });
 

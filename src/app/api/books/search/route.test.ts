@@ -3,16 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/auth", () => ({
   auth: vi.fn(),
 }));
-vi.mock("@/lib/google-books", () => ({
-  searchBooks: vi.fn(),
-  BooksApiError: class BooksApiError extends Error {
-    status: number;
-    constructor(msg: string, status: number) {
-      super(msg);
-      this.status = status;
-    }
-  },
-}));
+vi.mock("@/lib/google-books", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/google-books")>();
+  return {
+    ...actual,
+    searchBooks: vi.fn(),
+    BooksApiError: class BooksApiError extends Error {
+      status: number;
+      constructor(msg: string, status: number) {
+        super(msg);
+        this.status = status;
+      }
+    },
+  };
+});
 
 import { auth } from "@/auth";
 import { searchBooks, BooksApiError } from "@/lib/google-books";
