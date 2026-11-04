@@ -91,11 +91,23 @@ export function BookDetailModal({ item, open, onOpenChange, onItemChanged, onRem
         </DialogHeader>
 
         <div className="flex flex-col gap-5 sm:flex-row">
-          <BookCover
-            title={currentTitle}
-            coverUrl={item.book.coverUrl}
-            className="h-64 w-44 shrink-0 self-center rounded-lg shadow-md sm:self-start"
-          />
+          <div className="shrink-0 self-center sm:self-start">
+            <BookCover
+              title={currentTitle}
+              coverUrl={item.book.coverUrl}
+              className="h-64 w-44 rounded-lg shadow-md"
+            />
+            {item.book.backCoverUrl && (
+              <div className="mt-2">
+                <BookCover
+                  title={currentTitle}
+                  coverUrl={item.book.backCoverUrl}
+                  className="h-24 w-16 rounded shadow-sm"
+                />
+                <p className="mt-0.5 text-[10px] text-muted-foreground">{t.detail.backCover}</p>
+              </div>
+            )}
+          </div>
           <div className="min-w-0 flex-1 space-y-4">
             {item.book.authors.length > 0 && (
               <p className="text-sm text-muted-foreground">{item.book.authors.join(", ")}</p>

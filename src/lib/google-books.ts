@@ -234,13 +234,14 @@ export async function enrichFromOtherEditions(nb: NormalizedBook): Promise<Norma
       }
     : nb;
 
-  // ยังขาดปกหรือคำอธิบาย → ลองร้านไทย (ปก+คำอธิบายไทยจาก WooCommerce)
+  // ยังขาดปกหรือคำอธิบาย → ลองร้านไทย (ปก+ปกหลัง+คำอธิบายจาก WooCommerce / Library House)
   if (!merged.coverUrl || !merged.description) {
     const thai = await scrapeThaiCover({ isbn13: nb.isbn13, title: nb.title });
     if (thai) {
       merged = {
         ...merged,
         coverUrl: merged.coverUrl || thai.coverUrl || null,
+        backCoverUrl: merged.backCoverUrl ?? thai.backCoverUrl ?? null,
         description: merged.description ?? thai.description,
       };
     }

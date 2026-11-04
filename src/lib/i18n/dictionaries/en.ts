@@ -72,7 +72,8 @@ export const en = {
     noDescription: "No description",
     addTag: "Add tag...",
     close: "Close",
-    otherEditions: "Other edition covers (by year)",
+    backCover: "Back cover",
+      otherEditions: "Other edition covers (by year)",
     pickCover: "Click to use this cover",
   },
   common: {

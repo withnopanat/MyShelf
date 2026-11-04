@@ -82,3 +82,35 @@ describe("sitemap store adapter", () => {
     expect(r).toBeNull();
   });
 });
+
+// รูปแบบจริงของ Library House: <product-main :product='{ JSON }'> — images[] รวมปกหลังเมื่อร้านอัปโหลด
+function pageWithProductJson(title: string, images: string[], isbn?: string) {
+  const product = { product_id: 1, name: title, images: images.map((u, i) => ({ id: i, image_url: u })) };
+  const json = JSON.stringify(product).replace(/'/g, "&#039;");
+  return `<html><head><meta property="og:title" content="${title}"><meta property="og:image" content="${images[0]}"></head><body><product-main :product='${json}'></body></html>`;
+}
+
+describe("sitemap store adapter — back cover", () => {
+  it("รูปเดียว → backCoverUrl null", async () => {
+    router([
+      ["shop.x.com/sitemap", `<?xml version="1.0"?><urlset><url><loc>https://shop.x.com/th/product/1/a</loc></url></urlset>`],
+      ["product/1/a", pageWithProductJson("ปลายชีวิต", ["https://cdn.x/front.jpg"], "9786161111111")],
+    ]);
+    const r = await scrapeThaiCover({ isbn13: "9786161111111", title: "ปลายชีวิต" }, [], ["shop.x.com"]);
+    expect(r?.coverUrl).toBe("https://cdn.x/front.jpg");
+    expect(r?.backCoverUrl).toBeNull();
+  });
+
+  it("รูปสองรูป → รูปแรกเป็นปกหน้า รูปที่สองเป็นปกหลัง", async () => {
+    router([
+      ["shop.x.com/sitemap", `<?xml version="1.0"?><urlset><url><loc>https://shop.x.com/th/product/1/a</loc></url></urlset>`],
+      [
+        "product/1/a",
+        pageWithProductJson("โอลก้า", ["https://cdn.x/front.jpg", "https://cdn.x/back.jpg"], "9786162222222"),
+      ],
+    ]);
+    const r = await scrapeThaiCover({ isbn13: "9786162222222", title: "โอลก้า" }, [], ["shop.x.com"]);
+    expect(r?.coverUrl).toBe("https://cdn.x/front.jpg");
+    expect(r?.backCoverUrl).toBe("https://cdn.x/back.jpg");
+  });
+});

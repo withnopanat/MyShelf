@@ -70,7 +70,8 @@ export const th = {
     noDescription: "ไม่มีคำอธิบาย",
     addTag: "เพิ่มแท็ก...",
     close: "ปิด",
-    otherEditions: "ปกฉบับอื่น (เรียงตามปี)",
+    backCover: "ปกหลัง",
+      otherEditions: "ปกฉบับอื่น (เรียงตามปี)",
     pickCover: "กดเพื่อใช้ปกนี้",
   },
   common: {

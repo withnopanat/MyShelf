@@ -68,6 +68,7 @@ model Book {
   isbn10          String?
   isbn13          String?
   coverUrl        String?
+  backCoverUrl    String?     // ปกหลัง (จาก Library House เมื่อร้านอัปโหลด 2 รูป)
   publisher       String?
   publishedDate   String?
   description     String?

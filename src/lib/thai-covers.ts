@@ -15,7 +15,7 @@ export const SITEMAP_STORES = ["https://shop.libraryhousebangkok.com"];
 const CRAWL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CRAWL_CONCURRENCY = 8;
 
-type CatalogEntry = { title: string; coverUrl: string; isbn: string | null };
+type CatalogEntry = { title: string; coverUrl: string; backCoverUrl: string | null; isbn: string | null };
 type SitemapStore = { base: string; entries: CatalogEntry[]; fetchedAt: number };
 const sitemapCache = new Map<string, SitemapStore>();
 
@@ -117,7 +117,23 @@ async function crawlSitemapStore(base: string): Promise<CatalogEntry[]> {
     const image = meta(page, "og:image");
     if (!title || !image) continue;
     const isbn = page.match(/97[89]\d{10}/)?.[0] ?? null;
-    entries.push({ title, coverUrl: image, isbn });
+
+    // Library House ฝัง JSON ใน <product-main :product='{...}'> — images[] มีปกหลังด้วยเมื่อร้านอัปโหลด
+    let backCoverUrl: string | null = null;
+    const productJson = page.match(/<product-main\s+:product='([^']+)'/i)?.[1];
+    if (productJson) {
+      try {
+        const product = JSON.parse(
+          productJson.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&"),
+        ) as { images?: Array<{ image_url?: string }> };
+        const urls = (product.images ?? []).map((img) => img.image_url).filter((u): u is string => !!u);
+        if (urls.length > 1) backCoverUrl = urls[1];
+      } catch {
+        // JSON พัง → ใช้ og:image อย่างเดียว
+      }
+    }
+
+    entries.push({ title, coverUrl: image, backCoverUrl, isbn });
   }
 
   sitemapCache.set(base, { base, entries, fetchedAt: Date.now() });
@@ -136,7 +152,7 @@ function titleMatches(ogTitle: string, query: string): boolean {
 async function scrapeSitemapStore(
   base: string,
   input: { isbn13?: string | null; title: string },
-): Promise<{ coverUrl: string } | null> {
+): Promise<{ coverUrl: string; backCoverUrl: string | null } | null> {
   let entries: CatalogEntry[];
   try {
     entries = await crawlSitemapStore(base);
@@ -147,7 +163,7 @@ async function scrapeSitemapStore(
   const match =
     (input.isbn13 ? entries.find((e) => e.isbn === input.isbn13) : undefined) ??
     entries.find((e) => titleMatches(e.title, input.title));
-  return match ? { coverUrl: match.coverUrl } : null;
+  return match ? { coverUrl: match.coverUrl, backCoverUrl: match.backCoverUrl } : null;
 }
 
 // ── public ──────────────────────────────────────────────────────────
@@ -156,14 +172,14 @@ export async function scrapeThaiCover(
   input: { isbn13?: string | null; title: string },
   wooStores: string[] = WOOCOMMERCE_STORES,
   sitemapStores: string[] = SITEMAP_STORES,
-): Promise<{ coverUrl: string; description: string | null } | null> {
+): Promise<{ coverUrl: string; backCoverUrl: string | null; description: string | null } | null> {
   for (const base of wooStores) {
     const r = await scrapeWooCommerce(base, input);
-    if (r) return r;
+    if (r) return { ...r, backCoverUrl: null };
   }
   for (const base of sitemapStores) {
     const r = await scrapeSitemapStore(base, input);
-    if (r) return { coverUrl: r.coverUrl, description: null };
+    if (r) return { coverUrl: r.coverUrl, backCoverUrl: r.backCoverUrl, description: null };
   }
   return null;
 }

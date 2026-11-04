@@ -11,6 +11,7 @@ export type ShelfBook = {
   isbn10: string | null;
   isbn13: string | null;
   coverUrl: string | null;
+  backCoverUrl: string | null;
   publisher: string | null;
   publishedDate: string | null;
   description: string | null;

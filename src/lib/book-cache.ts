@@ -26,6 +26,7 @@ export async function upsertBook(nb: NormalizedBook) {
     isbn10: nb.isbn10,
     isbn13: nb.isbn13,
     coverUrl: nb.coverUrl,
+    backCoverUrl: nb.backCoverUrl ?? null,
     publisher: nb.publisher,
     publishedDate: nb.publishedDate,
     description: nb.description,
