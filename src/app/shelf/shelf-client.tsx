@@ -162,6 +162,7 @@ export function ShelfClient({
             if (item) setDetail(item);
           }}
         />
+        )}
       </div>
 
       <BookDetailModal
