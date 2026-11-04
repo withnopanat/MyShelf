@@ -7,11 +7,11 @@ export function titleHue(title: string): number {
   return [...title].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
 }
 
-/** สันหนังสือ: พื้นสีเข้ม + ชื่อเรื่องแนวตั้ง (หมุนข้อความ 90°) */
+/** สันหนังสือ: พื้นสีเข้ม + ชื่อเรื่องแนวตั้ง — วาด canvas ความละเอียดสูงเสมอ กันภาพเบลอ */
 export function makeSpineTexture(title: string, w: number, h: number): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(32, Math.round(w));
-  canvas.height = Math.round(h);
+  canvas.width = 256;
+  canvas.height = 1600;
   const ctx = canvas.getContext("2d")!;
   const hue = titleHue(title);
   const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -20,21 +20,21 @@ export function makeSpineTexture(title: string, w: number, h: number): THREE.Can
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "rgba(255,255,255,0.92)";
-  const fontPx = Math.max(11, Math.min(20, canvas.width * 0.55));
+  const fontPx = Math.max(28, Math.min(64, (canvas.height - 80) / Math.max(1, title.length)));
   ctx.font = `600 ${fontPx}px "IBM Plex Sans Thai", "Segoe UI", sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.save();
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.rotate(Math.PI / 2);
-  ctx.fillText(title.slice(0, 22), 0, 0, canvas.height - 8);
+  ctx.fillText(title.slice(0, 22), 0, 0, canvas.height - 80);
   ctx.restore();
-  // แถบไฮไลต์ขอบสัน
-  ctx.fillStyle = "rgba(255,255,255,0.12)";
-  ctx.fillRect(0, 0, 2, canvas.height);
-  ctx.fillRect(canvas.width - 2, 0, 2, canvas.height);
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.fillRect(0, 0, 6, canvas.height);
+  ctx.fillRect(canvas.width - 6, 0, 6, canvas.height);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
   return tex;
 }
 

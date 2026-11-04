@@ -5,9 +5,9 @@
 
 export type BookDims = { width: number; height: number; depth: number };
 
-/** สัดส่วนมาตรฐานหนังสือไทย 13×19 ซม. ความหนาจากจำนวนหน้า (~0.11 มม./หน้า) */
+/** สัดส่วนมาตรฐานหนังสือไทย 13×19 ซม. ความหนาจากจำนวนหน้า (0.11 มม./หน้า = 0.011 ซม.) */
 export function bookDimensions(pageCount: number | null | undefined): BookDims {
-  const depth = pageCount === null ? 20 : Math.min(Math.max(pageCount * 0.11, 9), 45);
+  const depth = pageCount == null ? 2 : Math.min(Math.max(pageCount * 0.011, 0.9), 4.5);
   return { width: 13, height: 19, depth };
 }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import * as THREE from "three";
 import { useCoverTexture } from "./use-cover-texture";
 import { makePagesTexture, makePlainTexture, makeSpineTexture, titleHue } from "./textures";
 import { bookDimensions } from "@/lib/bookshelf-3d";
@@ -35,54 +34,39 @@ export function BookMesh({
   const pagesTex = useMemo(() => makePagesTexture(), []);
   const plainTex = useMemo(() => makePlainTexture(hue), [hue]);
 
-  const pagesMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ map: pagesTex, roughness: 0.9 }),
-    [pagesTex],
-  );
-  const spineMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ map: spineTex, roughness: 0.85 }),
-    [spineTex],
-  );
-  const coverMat = useMemo(
-    () =>
-      frontTex
-        ? new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.7 })
-        : new THREE.MeshStandardMaterial({
-            color: new THREE.Color(`hsl(${hue} 32% 62%)`),
-            roughness: 0.7,
-          }),
-    [frontTex, hue],
-  );
-  const backMat = useMemo(
-    () =>
-      backTex
-        ? new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.7 })
-        : new THREE.MeshStandardMaterial({ map: plainTex, roughness: 0.85 }),
-    [backTex, plainTex, hue],
-  );
+  const coverColor = `hsl(${hue} 32% 62%)`;
+  const backColor = `hsl(${hue} 28% 34%)`;
 
   // ลำดับ material ของ BoxGeometry: [+x, -x, +y, -y, +z, -z]
-  const spineOutMats = useMemo(
-    () => [pagesMat, pagesMat, pagesMat, pagesMat, spineMat, pagesMat],
-    [pagesMat, spineMat],
+  // key บังคับ remount เมื่อ texture มาทีหลัง — กัน shader เก่าที่ไม่มี map
+  const spineOut = (
+    <>
+      <meshStandardMaterial key={`f-${frontTex ? 1 : 0}`} attach="material-0" map={frontTex ?? undefined} color={coverColor} roughness={0.7} />
+      <meshStandardMaterial key={`b-${backTex ? 1 : 0}`} attach="material-1" map={backTex ?? plainTex} color={backColor} roughness={0.85} />
+      <meshStandardMaterial attach="material-2" map={pagesTex} roughness={0.9} />
+      <meshStandardMaterial attach="material-3" map={pagesTex} roughness={0.9} />
+      <meshStandardMaterial attach="material-4" map={spineTex} roughness={0.85} />
+      <meshStandardMaterial attach="material-5" map={pagesTex} roughness={0.9} />
+    </>
   );
-  const coverOutMats = useMemo(
-    () => [spineMat, pagesMat, pagesMat, pagesMat, coverMat, backMat],
-    [spineMat, pagesMat, coverMat, backMat],
+
+  const coverOut = (
+    <>
+      <meshStandardMaterial attach="material-0" map={spineTex} roughness={0.85} />
+      <meshStandardMaterial attach="material-1" map={pagesTex} roughness={0.9} />
+      <meshStandardMaterial attach="material-2" map={pagesTex} roughness={0.9} />
+      <meshStandardMaterial attach="material-3" map={pagesTex} roughness={0.9} />
+      <meshStandardMaterial key={`f-${frontTex ? 1 : 0}`} attach="material-4" map={frontTex ?? undefined} color={coverColor} roughness={0.7} />
+      <meshStandardMaterial key={`b-${backTex ? 1 : 0}`} attach="material-5" map={backTex ?? plainTex} color={backColor} roughness={0.85} />
+    </>
   );
 
   const args = orientation === "spineOut" ? [depth, height, width] : [width, height, depth];
-  const mats = orientation === "spineOut" ? spineOutMats : coverOutMats;
 
   return (
     <mesh castShadow>
       <boxGeometry args={args as [number, number, number]} />
-      <meshStandardMaterial attach="material-0" {...mats[0]} />
-      <meshStandardMaterial attach="material-1" {...mats[1]} />
-      <meshStandardMaterial attach="material-2" {...mats[2]} />
-      <meshStandardMaterial attach="material-3" {...mats[3]} />
-      <meshStandardMaterial attach="material-4" {...mats[4]} />
-      <meshStandardMaterial attach="material-5" {...mats[5]} />
+      {orientation === "spineOut" ? spineOut : coverOut}
     </mesh>
   );
 }

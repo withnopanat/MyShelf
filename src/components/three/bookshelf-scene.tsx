@@ -45,7 +45,7 @@ export function BookshelfScene({
 
   return (
     <div className="h-[520px] w-full overflow-hidden rounded-xl border border-border bg-card">
-      <Canvas camera={{ position: [0, totalH / 2 + 26, 88], fov: 40 }} shadows>
+      <Canvas camera={{ position: [0, totalH / 2 + 20, 145], fov: 35 }} shadows>
         <ambientLight intensity={0.85} />
         <directionalLight position={[0, 60, 90]} intensity={1.5} castShadow />
         <directionalLight position={[-50, 30, 40]} intensity={0.4} />
@@ -104,7 +104,12 @@ export function BookshelfScene({
                 />
               </group>
               {isHovered && (
-                <Html position={[d.depth + 4, d.height / 2, 0]} center distanceFactor={55}>
+                <Html
+                  position={[d.depth + 4, d.height / 2, 0]}
+                  center
+                  distanceFactor={55}
+                  style={{ pointerEvents: "none" }}
+                >
                   <div className="w-44 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     {b.coverUrl && <img src={b.coverUrl} alt="" className="mx-auto h-24 rounded shadow" />}
@@ -124,8 +129,8 @@ export function BookshelfScene({
         <OrbitControls
           target={[0, totalH / 2 - 2, 0]}
           enablePan={false}
-          minDistance={45}
-          maxDistance={160}
+          minDistance={70}
+          maxDistance={240}
           minPolarAngle={0.6}
           maxPolarAngle={1.45}
         />

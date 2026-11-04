@@ -2,23 +2,23 @@ import { describe, expect, it } from "vitest";
 import { bookDimensions, layoutShelf } from "@/lib/bookshelf-3d";
 
 describe("bookDimensions", () => {
-  it("สัดส่วนมาตรฐาน 13×19 ซม. และความหนาจากจำนวนหน้า (~0.11 มม./หน้า)", () => {
+  it("สัดส่วนมาตรฐาน 13×19 ซม. และความหนาจากจำนวนหน้า (0.11 มม./หน้า = 0.011 ซม.)", () => {
     const d = bookDimensions(330);
     expect(d.width).toBeCloseTo(13);
     expect(d.height).toBeCloseTo(19);
-    expect(d.depth).toBeCloseTo(36.3, 1);
+    expect(d.depth).toBeCloseTo(3.63, 2);
   });
 
-  it("เล่มบางมาก → ไม่ต่ำกว่า 9 มม.", () => {
-    expect(bookDimensions(32).depth).toBeCloseTo(9);
+  it("เล่มบางมาก → ไม่ต่ำกว่า 0.9 ซม.", () => {
+    expect(bookDimensions(32).depth).toBeCloseTo(0.9);
   });
 
-  it("เล่มหนามาก → ไม่เกิน 45 มม.", () => {
-    expect(bookDimensions(900).depth).toBeCloseTo(45);
+  it("เล่มหนามาก → ไม่เกิน 4.5 ซม.", () => {
+    expect(bookDimensions(900).depth).toBeCloseTo(4.5);
   });
 
-  it("ไม่รู้จำนวนหน้า → 20 มม.", () => {
-    expect(bookDimensions(null).depth).toBeCloseTo(20);
+  it("ไม่รู้จำนวนหน้า → 2 ซม.", () => {
+    expect(bookDimensions(null).depth).toBeCloseTo(2);
   });
 });
 

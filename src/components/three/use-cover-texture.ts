@@ -2,21 +2,22 @@
 
 import { useEffect, useState } from "react";
 import * as THREE from "three";
+import { toProxyCoverUrl } from "@/lib/cover-proxy";
 
-/** โหลด texture ปกด้วย TextureLoader — โหลดไม่ได้ (CORS/404) → คืน null ให้ fallback เป็นสี */
+/** โหลด texture ปกผ่าน proxy ภายใน (เลี่ยง CORS) — โหลดไม่ได้ → คืน null ให้ fallback เป็นสี */
 export function useCoverTexture(url: string | null | undefined): THREE.Texture | null {
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
 
   useEffect(() => {
-    if (!url) {
+    const proxied = toProxyCoverUrl(url);
+    if (!proxied) {
       setTexture(null);
       return;
     }
     let cancelled = false;
     const loader = new THREE.TextureLoader();
-    loader.setCrossOrigin("anonymous");
     loader.load(
-      url,
+      proxied,
       (tex) => {
         if (cancelled) {
           tex.dispose();
