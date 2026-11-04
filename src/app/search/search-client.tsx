@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { BookCard } from "@/components/book-card";
 import { AddToShelfButton } from "@/components/add-to-shelf-button";
+import { BookInfoModal } from "@/components/book-info-modal";
 import { EmptyState } from "@/components/empty-state";
 import { searchBooksClient, fetchShelf } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n/i18n-provider";
@@ -30,6 +31,7 @@ export function SearchClient() {
   const [results, setResults] = useState<NormalizedBook[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [detailBook, setDetailBook] = useState<NormalizedBook | null>(null);
   const [shelfStatuses, setShelfStatuses] = useState<Map<string, BookStatus>>(new Map());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -125,6 +127,7 @@ export function SearchClient() {
                   onShelfStatus={
                     book.googleBooksId ? shelfStatuses.get(book.googleBooksId) ?? null : null
                   }
+                  onClick={() => setDetailBook(book)}
                 />
                 <AddToShelfButton
                   book={book}
@@ -144,6 +147,20 @@ export function SearchClient() {
           />
         )}
       </div>
+
+      <BookInfoModal
+        book={detailBook}
+        open={detailBook !== null}
+        onOpenChange={(next) => !next && setDetailBook(null)}
+        onShelfStatus={
+          detailBook?.googleBooksId ? shelfStatuses.get(detailBook.googleBooksId) ?? null : null
+        }
+        onAdded={(status) => {
+          if (detailBook?.googleBooksId) {
+            setShelfStatuses((prev) => new Map(prev).set(detailBook.googleBooksId!, status));
+          }
+        }}
+      />
     </div>
   );
 }
