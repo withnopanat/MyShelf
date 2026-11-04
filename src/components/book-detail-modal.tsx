@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookCover } from "@/components/book-cover";
+import dynamic from "next/dynamic";
 import { TagEditor } from "@/components/tag-editor";
 import { Book3D } from "@/components/book-3d";
 import { EditionCovers } from "@/components/edition-covers";
@@ -29,6 +30,11 @@ type Props = {
   onItemChanged?: () => void;
   onRemove?: (item: ShelfItem) => void;
 };
+
+const Book3DViewer = dynamic(
+  () => import("@/components/three/book-3d-viewer").then((m) => m.Book3DViewer),
+  { ssr: false },
+);
 
 export function BookDetailModal({ item, open, onOpenChange, onItemChanged, onRemove }: Props) {
   const { t } = useI18n();
@@ -93,6 +99,13 @@ export function BookDetailModal({ item, open, onOpenChange, onItemChanged, onRem
 
         <div className="flex flex-col gap-5 sm:flex-row">
           <div className="shrink-0 self-center sm:self-start">
+            <Book3DViewer
+              title={currentTitle}
+              coverUrl={item.book.coverUrl}
+              backCoverUrl={item.book.backCoverUrl}
+              pages={item.book.pageCount}
+              className="h-64 w-60 rounded-lg"
+            />
             <Book3D
               title={currentTitle}
               coverUrl={item.book.coverUrl}

@@ -48,6 +48,8 @@ export const en = {
     empty: "Your shelf is empty",
     emptyHint: "Search or scan an ISBN to add your first book",
     searchInShelf: "Search in shelf...",
+    hint: "Drag to orbit · Hover a book for details · Click to open in 3D",
+    clickHint: "Click to open in 3D",
     changeStatus: "Change status",
     remove: "Remove from shelf",
     removeConfirmTitle: "Remove book from shelf?",

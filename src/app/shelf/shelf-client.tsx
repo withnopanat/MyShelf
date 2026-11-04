@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -23,7 +24,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BookCover } from "@/components/book-cover";
-import { Book3D } from "@/components/book-3d";
 import { EmptyState } from "@/components/empty-state";
 import { BookDetailModal } from "@/components/book-detail-modal";
 import { ManualBookForm } from "@/components/manual-book-form";
@@ -35,6 +35,11 @@ import type { BookStatus } from "@/generated/prisma/client";
 import { cn } from "@/lib/utils";
 
 type Counts = Record<string, number | undefined>;
+
+const BookshelfScene = dynamic(
+  () => import("@/components/three/bookshelf-scene").then((m) => m.BookshelfScene),
+  { ssr: false, loading: () => <div className="h-[520px] w-full animate-pulse rounded-xl bg-muted" /> },
+);
 
 export function ShelfClient({
   items,
@@ -142,90 +147,22 @@ export function ShelfClient({
             }
           />
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {visible.map((item) => (
-              <div
-                key={item.id}
-                className="flex cursor-pointer gap-3 rounded-xl border border-border bg-card p-3 transition-shadow hover:shadow-md group"
-                onClick={() => setDetail(item)}
-              >
-                {item.book.pageCount ? (
-                  <Book3D
-                    title={item.book.title}
-                    coverUrl={item.book.coverUrl}
-                    pages={item.book.pageCount}
-                    size="sm"
-                    className="shrink-0"
-                  />
-                ) : (
-                  <BookCover
-                    title={item.book.title}
-                    coverUrl={item.book.coverUrl}
-                    className="h-28 w-20 shrink-0 rounded-md shadow-sm"
-                  />
-                )}
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <p className="line-clamp-2 text-sm font-semibold leading-snug">{item.book.title}</p>
-                  {item.book.authors.length > 0 && (
-                    <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                      {item.book.authors.join(", ")}
-                    </p>
-                  )}
-                  <Badge className={cn("mt-1 w-fit border-transparent", STATUS_COLORS[item.status])}>
-                    {t.status[item.status]}
-                  </Badge>
-                  {item.tags.length > 0 && (
-                    <p className="mt-1 line-clamp-1 text-xs text-muted-foreground/70">
-                      {item.tags.map((tag) => `#${tag}`).join(" ")}
-                    </p>
-                  )}
-                </div>
-                <div onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={t.shelf.changeStatus}>
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {BOOK_STATUSES.filter((s) => s !== item.status).map((s) => (
-                      <DropdownMenuItem key={s} onClick={() => changeStatus(item, s)}>
-                        {t.shelf.changeStatus}: {t.status[s]}
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => setToRemove(item)}
-                    >
-                      {t.shelf.remove}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                  <BookshelfScene
+          books={visible.map((item) => ({
+            itemId: item.id,
+            title: item.book.title,
+            authors: item.book.authors,
+            coverUrl: item.book.coverUrl,
+            backCoverUrl: item.book.backCoverUrl,
+            pageCount: item.book.pageCount,
+            status: item.status,
+          }))}
+          onSelect={(itemId) => {
+            const item = visible.find((v) => v.id === itemId);
+            if (item) setDetail(item);
+          }}
+        />
       </div>
-
-      <Dialog open={toRemove !== null} onOpenChange={(open) => !open && setToRemove(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t.shelf.removeConfirmTitle}</DialogTitle>
-            <DialogDescription>
-              {t.shelf.removeConfirmBody.replace("{title}", toRemove?.book.title ?? "")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setToRemove(null)}>
-              {t.shelf.cancel}
-            </Button>
-            <Button variant="destructive" onClick={remove} disabled={pending}>
-              {t.shelf.confirmRemove}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <BookDetailModal
         item={detail}
