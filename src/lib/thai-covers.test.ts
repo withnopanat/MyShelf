@@ -84,8 +84,8 @@ describe("sitemap store adapter", () => {
 });
 
 // รูปแบบจริงของ Library House: <product-main :product='{ JSON }'> — images[] รวมปกหลังเมื่อร้านอัปโหลด
-function pageWithProductJson(title: string, images: string[], isbn?: string) {
-  const product = { product_id: 1, name: title, images: images.map((u, i) => ({ id: i, image_url: u })) };
+function pageWithProductJson(title: string, images: string[], isbn?: string, description?: string) {
+  const product = { product_id: 1, name: title, images: images.map((u, i) => ({ id: i, image_url: u })), description: description ?? "" };
   const json = JSON.stringify(product).replace(/'/g, "&#039;");
   return `<html><head><meta property="og:title" content="${title}"><meta property="og:image" content="${images[0]}"></head><body><product-main :product='${json}'></body></html>`;
 }
@@ -112,5 +112,42 @@ describe("sitemap store adapter — back cover", () => {
     const r = await scrapeThaiCover({ isbn13: "9786162222222", title: "โอลก้า" }, [], ["shop.x.com"]);
     expect(r?.coverUrl).toBe("https://cdn.x/front.jpg");
     expect(r?.backCoverUrl).toBe("https://cdn.x/back.jpg");
+  });
+});
+
+describe("pageCount parsing", () => {
+  it("WooCommerce description มี '319 หน้า' → คืน pageCount", async () => {
+    router([
+      [
+        "store.example/wp-json",
+        JSON.stringify([
+          {
+            name: "THE SEVEN YEAR SLIP",
+            sku: "9786162986864",
+            images: [{ src: "https://store.example/cover.png" }],
+            description: "<p>เรื่องราวข้ามเวลา</p><p>319 หน้า · ปกอ่อน</p>",
+          },
+        ]),
+      ],
+    ]);
+    const r = await scrapeThaiCover({ isbn13: "9786162986864", title: "x" }, ["https://store.example"], []);
+    expect(r?.pageCount).toBe(319);
+  });
+
+  it("Library House description มี '330 หน้า' → คืน pageCount", async () => {
+    router([
+      ["shop.x.com/sitemap", `<?xml version="1.0"?><urlset><url><loc>https://shop.x.com/th/product/1/a</loc></url></urlset>`],
+      ["product/1/a", pageWithProductJson("ในกรงแก้ว", ["https://cdn.x/front.jpg"], "9786163333333", "<p>เรื่องของเอสเธอร์</p><p>330 หน้า</p>")],
+    ]);
+    const r = await scrapeThaiCover({ isbn13: "9786163333333", title: "ในกรงแก้ว" }, [], ["shop.x.com"]);
+    expect(r?.pageCount).toBe(330);
+  });
+
+  it("ไม่ระบุจำนวนหน้า → pageCount null", async () => {
+    router([
+      ["store.example/wp-json", JSON.stringify([{ name: "x", images: [{ src: "https://store.example/c.png" }] }])],
+    ]);
+    const r = await scrapeThaiCover({ isbn13: "9780000000001", title: "x" }, ["https://store.example"], []);
+    expect(r?.pageCount).toBeNull();
   });
 });

@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BookCover } from "@/components/book-cover";
+import { Book3D } from "@/components/book-3d";
 import { EmptyState } from "@/components/empty-state";
 import { BookDetailModal } from "@/components/book-detail-modal";
 import { ManualBookForm } from "@/components/manual-book-form";
@@ -145,14 +146,24 @@ export function ShelfClient({
             {visible.map((item) => (
               <div
                 key={item.id}
-                className="flex cursor-pointer gap-3 rounded-xl border border-border bg-card p-3 transition-shadow hover:shadow-md"
+                className="flex cursor-pointer gap-3 rounded-xl border border-border bg-card p-3 transition-shadow hover:shadow-md group"
                 onClick={() => setDetail(item)}
               >
-                <BookCover
-                  title={item.book.title}
-                  coverUrl={item.book.coverUrl}
-                  className="h-28 w-20 shrink-0 rounded-md shadow-sm"
-                />
+                {item.book.pageCount ? (
+                  <Book3D
+                    title={item.book.title}
+                    coverUrl={item.book.coverUrl}
+                    pages={item.book.pageCount}
+                    size="sm"
+                    className="shrink-0"
+                  />
+                ) : (
+                  <BookCover
+                    title={item.book.title}
+                    coverUrl={item.book.coverUrl}
+                    className="h-28 w-20 shrink-0 rounded-md shadow-sm"
+                  />
+                )}
                 <div className="flex min-w-0 flex-1 flex-col">
                   <p className="line-clamp-2 text-sm font-semibold leading-snug">{item.book.title}</p>
                   {item.book.authors.length > 0 && (

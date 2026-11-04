@@ -15,7 +15,7 @@ export const SITEMAP_STORES = ["https://shop.libraryhousebangkok.com"];
 const CRAWL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CRAWL_CONCURRENCY = 8;
 
-type CatalogEntry = { title: string; coverUrl: string; backCoverUrl: string | null; isbn: string | null };
+type CatalogEntry = { title: string; coverUrl: string; backCoverUrl: string | null; isbn: string | null; pageCount: number | null };
 type SitemapStore = { base: string; entries: CatalogEntry[]; fetchedAt: number };
 const sitemapCache = new Map<string, SitemapStore>();
 
@@ -51,6 +51,13 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+/** "319 หน้า" → 319 (ใช้ทำความหนาของหนังสือ 3D) */
+function parsePageCount(text: string): number | null {
+  const m = text.match(/(\d{1,4})\s*หน้า/);
+  const n = m ? Number(m[1]) : NaN;
+  return Number.isFinite(n) && n > 0 && n <= 3000 ? n : null;
+}
+
 // ── 1) WooCommerce Store API ────────────────────────────────────────
 
 type WooProduct = {
@@ -64,7 +71,7 @@ type WooProduct = {
 async function scrapeWooCommerce(
   base: string,
   input: { isbn13?: string | null; title: string },
-): Promise<{ coverUrl: string; description: string | null } | null> {
+): Promise<{ coverUrl: string; description: string | null; pageCount: number | null } | null> {
   const query = input.isbn13 || input.title;
   const text = await fetchText(
     `${base}/wp-json/wc/store/v1/products?search=${encodeURIComponent(query)}&per_page=5`,
@@ -85,8 +92,9 @@ async function scrapeWooCommerce(
 
   const coverUrl = product.images?.[0]?.thumbnail ?? product.images?.[0]?.src;
   const description = stripHtml(product.description ?? product.short_description ?? "");
+  const pageCount = parsePageCount(description);
   if (!coverUrl && !description) return null;
-  return { coverUrl: coverUrl ?? "", description: description || null };
+  return { coverUrl: coverUrl ?? "", description: description || null, pageCount };
 }
 
 // ── 2) Sitemap crawl (ร้าน JS-render) ───────────────────────────────
@@ -118,22 +126,24 @@ async function crawlSitemapStore(base: string): Promise<CatalogEntry[]> {
     if (!title || !image) continue;
     const isbn = page.match(/97[89]\d{10}/)?.[0] ?? null;
 
-    // Library House ฝัง JSON ใน <product-main :product='{...}'> — images[] มีปกหลังด้วยเมื่อร้านอัปโหลด
+    // Library House ฝัง JSON ใน <product-main :product='{...}'> — images[] มีปกหลัง + description มีจำนวนหน้า
     let backCoverUrl: string | null = null;
+    let pageCount: number | null = null;
     const productJson = page.match(/<product-main\s+:product='([^']+)'/i)?.[1];
     if (productJson) {
       try {
         const product = JSON.parse(
           productJson.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&"),
-        ) as { images?: Array<{ image_url?: string }> };
+        ) as { images?: Array<{ image_url?: string }>; description?: string };
         const urls = (product.images ?? []).map((img) => img.image_url).filter((u): u is string => !!u);
         if (urls.length > 1) backCoverUrl = urls[1];
+        pageCount = parsePageCount(stripHtml(product.description ?? ""));
       } catch {
         // JSON พัง → ใช้ og:image อย่างเดียว
       }
     }
 
-    entries.push({ title, coverUrl: image, backCoverUrl, isbn });
+    entries.push({ title, coverUrl: image, backCoverUrl, isbn, pageCount });
   }
 
   sitemapCache.set(base, { base, entries, fetchedAt: Date.now() });
@@ -152,7 +162,7 @@ function titleMatches(ogTitle: string, query: string): boolean {
 async function scrapeSitemapStore(
   base: string,
   input: { isbn13?: string | null; title: string },
-): Promise<{ coverUrl: string; backCoverUrl: string | null } | null> {
+): Promise<{ coverUrl: string; backCoverUrl: string | null; pageCount: number | null } | null> {
   let entries: CatalogEntry[];
   try {
     entries = await crawlSitemapStore(base);
@@ -163,7 +173,7 @@ async function scrapeSitemapStore(
   const match =
     (input.isbn13 ? entries.find((e) => e.isbn === input.isbn13) : undefined) ??
     entries.find((e) => titleMatches(e.title, input.title));
-  return match ? { coverUrl: match.coverUrl, backCoverUrl: match.backCoverUrl } : null;
+  return match ? { coverUrl: match.coverUrl, backCoverUrl: match.backCoverUrl, pageCount: match.pageCount } : null;
 }
 
 // ── public ──────────────────────────────────────────────────────────
@@ -172,14 +182,14 @@ export async function scrapeThaiCover(
   input: { isbn13?: string | null; title: string },
   wooStores: string[] = WOOCOMMERCE_STORES,
   sitemapStores: string[] = SITEMAP_STORES,
-): Promise<{ coverUrl: string; backCoverUrl: string | null; description: string | null } | null> {
+): Promise<{ coverUrl: string; backCoverUrl: string | null; description: string | null; pageCount: number | null } | null> {
   for (const base of wooStores) {
     const r = await scrapeWooCommerce(base, input);
     if (r) return { ...r, backCoverUrl: null };
   }
   for (const base of sitemapStores) {
     const r = await scrapeSitemapStore(base, input);
-    if (r) return { coverUrl: r.coverUrl, backCoverUrl: r.backCoverUrl, description: null };
+    if (r) return { coverUrl: r.coverUrl, backCoverUrl: r.backCoverUrl, description: null, pageCount: r.pageCount };
   }
   return null;
 }

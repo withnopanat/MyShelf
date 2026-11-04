@@ -234,7 +234,7 @@ export async function enrichFromOtherEditions(nb: NormalizedBook): Promise<Norma
       }
     : nb;
 
-  // ยังขาดปกหรือคำอธิบาย → ลองร้านไทย (ปก+ปกหลัง+คำอธิบายจาก WooCommerce / Library House)
+  // ยังขาดปกหรือคำอธิบาย → ลองร้านไทย (ปก+ปกหลัง+จำนวนหน้า+คำอธิบายจากร้านไทย)
   if (!merged.coverUrl || !merged.description) {
     const thai = await scrapeThaiCover({ isbn13: nb.isbn13, title: nb.title });
     if (thai) {
@@ -242,6 +242,7 @@ export async function enrichFromOtherEditions(nb: NormalizedBook): Promise<Norma
         ...merged,
         coverUrl: merged.coverUrl || thai.coverUrl || null,
         backCoverUrl: merged.backCoverUrl ?? thai.backCoverUrl ?? null,
+        pageCount: merged.pageCount ?? thai.pageCount ?? null,
         description: merged.description ?? thai.description,
       };
     }

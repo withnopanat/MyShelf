@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { BookCover } from "@/components/book-cover";
+import { Book3D } from "@/components/book-3d";
 import { EditionCovers } from "@/components/edition-covers";
 import { AddToShelfButton } from "@/components/add-to-shelf-button";
 import { useI18n } from "@/lib/i18n/i18n-provider";
@@ -44,10 +44,12 @@ export function BookInfoModal({ book, open, onOpenChange, onShelfStatus, onAdded
         </DialogHeader>
 
         <div className="flex flex-col gap-5 sm:flex-row">
-          <BookCover
+          <Book3D
             title={book.title}
             coverUrl={book.coverUrl}
-            className="h-64 w-44 shrink-0 self-center rounded-lg shadow-md sm:self-start"
+            pages={book.pageCount}
+            size="lg"
+            className="shrink-0 self-center sm:self-start"
           />
           <div className="min-w-0 flex-1 space-y-4">
             {book.authors.length > 0 && (

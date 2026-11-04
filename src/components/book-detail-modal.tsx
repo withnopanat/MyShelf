@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookCover } from "@/components/book-cover";
 import { TagEditor } from "@/components/tag-editor";
+import { Book3D } from "@/components/book-3d";
 import { EditionCovers } from "@/components/edition-covers";
 import { updateShelfItem, apiPatch, type ShelfItem } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n/i18n-provider";
@@ -92,10 +93,11 @@ export function BookDetailModal({ item, open, onOpenChange, onItemChanged, onRem
 
         <div className="flex flex-col gap-5 sm:flex-row">
           <div className="shrink-0 self-center sm:self-start">
-            <BookCover
+            <Book3D
               title={currentTitle}
               coverUrl={item.book.coverUrl}
-              className="h-64 w-44 rounded-lg shadow-md"
+              pages={item.book.pageCount}
+              size="lg"
             />
             {item.book.backCoverUrl && (
               <div className="mt-2">
