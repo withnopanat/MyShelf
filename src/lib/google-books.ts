@@ -283,10 +283,46 @@ export async function fetchEditions(title: string): Promise<NormalizedBook[]> {
   for (const candidate of titleQueryCandidates(title)) {
     try {
       last = await tryQuery(candidate);
-      if (last.length > 1) return last;
+      // พอเมื่อได้หลายฉบับ "และมีปกอย่างน้อยหนึ่งเล่ม" — ถ้าไม่มีปกเลย ให้ลอง candidate ถัดไปก่อน
+      if (last.length > 1 && last.some((b) => b.coverUrl)) return last;
     } catch {
       break; // API ล้ม — เลิกลองต่อ
     }
   }
+
+  // ทุกฉบับที่เจอไม่มีปกเลย (ชื่อล้วนไทย เช่น "อาชญากรรมกับการลงทัณฑ์" หาต้นฉบับละตินไม่ได้)
+  // → ค้น relevance แล้วรับเฉพาะฉบับที่ "ชื่อเป็นตัวอักษรต่างชุด + มีปก"
+  // (Google relevance มักเชื่อมงานแปลให้; ชื่อไทยที่มีปกแต่เป็นเล่มอื่นจะถูกกรองทิ้ง)
+  if (last.length > 0 && last.every((b) => !b.coverUrl)) {
+    try {
+      const url = new URL(BOOKS_API);
+      url.searchParams.set("q", title);
+      url.searchParams.set("maxResults", "20");
+      const key = process.env.GOOGLE_BOOKS_API_KEY;
+      if (key) url.searchParams.set("key", key);
+
+      const data = (await callGoogleBooks(url.toString())) as { items?: unknown[] };
+      const items = Array.isArray(data.items) ? data.items : [];
+      const foreign = items
+        .map(normalizeVolume)
+        .filter(
+          (b): b is NormalizedBook =>
+            b !== null &&
+            !!b.coverUrl &&
+            !/[\u0E00-\u0E7F]/.test(b.title), // ชื่อไม่มีอักษรไทย = น่าจะเป็นฉบับต้นฉบับ
+        );
+      if (foreign.length > 0) {
+        const seen = new Set(last.map((b) => b.googleBooksId));
+        const year = (b: NormalizedBook): number =>
+          Number(b.publishedDate?.slice(0, 4)) || Number.MAX_SAFE_INTEGER;
+        return [...last, ...foreign.filter((b) => !seen.has(b.googleBooksId))].sort(
+          (a, b) => year(a) - year(b),
+        );
+      }
+    } catch {
+      // เก็บผล intitle เดิมไว้
+    }
+  }
+
   return last;
 }

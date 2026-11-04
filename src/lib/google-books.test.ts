@@ -209,7 +209,7 @@ describe("fetchEditions fallback queries", () => {
       new Response(
         JSON.stringify({
           items: [
-            { id: "a", volumeInfo: { title: "A", publishedDate: "2020" } },
+            { id: "a", volumeInfo: { title: "A", publishedDate: "2020", imageLinks: { thumbnail: "https://x/a.jpg" } } },
             { id: "b", volumeInfo: { title: "B", publishedDate: "2023" } },
           ],
         }),
@@ -223,12 +223,12 @@ describe("fetchEditions fallback queries", () => {
     expect(secondUrl.searchParams.get("q")).toBe('intitle:"The seven year slip"');
   });
 
-  it("ชื่อละตินล้วนเจอหลายฉบับ → ยิงครั้งเดียวพอ", async () => {
+  it("ชื่อละตินล้วนเจอหลายฉบับมีปก → ยิงครั้งเดียวพอ", async () => {
     fetchMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
           items: [
-            { id: "a", volumeInfo: { title: "A" } },
+            { id: "a", volumeInfo: { title: "A", imageLinks: { thumbnail: "https://x/a.jpg" } } },
             { id: "b", volumeInfo: { title: "B" } },
           ],
         }),
@@ -236,6 +236,54 @@ describe("fetchEditions fallback queries", () => {
       ),
     );
     await fetchEditions("Harry Potter");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("fetchEditions foreign-script fallback", () => {
+  it("intitle ได้ฉบับไทยที่ไม่มีปกล้วน → ค้น relevance เพิ่ม แล้วรวมฉบับต่างภาษาที่มีปก", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [{ id: "th1", volumeInfo: { title: "อาชญากรรมกับการลงทัณฑ์", publishedDate: "2018" } }],
+        }),
+        { status: 200 },
+      ),
+    );
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [
+            { id: "noise", volumeInfo: { title: "ร้อยพันเรื่องราว", language: "th", imageLinks: { thumbnail: "https://x/noise.jpg" } } },
+            { id: "en1", volumeInfo: { title: "Crime and Punishment", language: "en", publishedDate: "2023", imageLinks: { thumbnail: "http://books.google.com/en.jpg" } } },
+            { id: "ru1", volumeInfo: { title: "Преступление и наказание", language: "ru", publishedDate: "1991" } },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const editions = await fetchEditions("อาชญากรรมกับการลงทัณฑ์");
+    // th1(2018) + en1(2023, มีปก) เรียงตามปี — ru1 ไม่มีปกจึงไม่รวม, noise เป็นชื่อไทยมีปก → ไม่รวม
+    expect(editions.map((e) => e.googleBooksId)).toEqual(["th1", "en1"]);
+    const secondUrl = new URL(fetchMock.mock.calls[1][0] as string);
+    expect(secondUrl.searchParams.get("q")).toBe("อาชญากรรมกับการลงทัณฑ์");
+  });
+
+  it("intitle เจอฉบับที่มีปกอยู่แล้ว → ไม่ยิง relevance query", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [
+            { id: "a", volumeInfo: { title: "A", imageLinks: { thumbnail: "https://x/a.jpg" } } },
+            { id: "b", volumeInfo: { title: "B" } },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const editions = await fetchEditions("anything");
+    expect(editions).toHaveLength(2);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
