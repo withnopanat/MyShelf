@@ -233,26 +233,60 @@ export async function enrichFromOtherEditions(nb: NormalizedBook): Promise<Norma
  * ดึง "ทุกฉบับพิมพ์" ของเรื่องเดียวกัน (ค้นด้วยชื่อเรื่อง)
  * เรียงตามปีที่พิมพ์เก่า→ใหม่ ฉบับที่ไม่ระบุปีไปท้าย
  * API ล้ม → คืน array ว่าง (เป็นฟีเจอร์เสริม ไม่ควรพังหน้ารายละเอียด)
+ *
+ * ชื่อแปลไทยมักเป็น "ชื่ออังกฤษ + คำแปล" — intitle ด้วยชื่อเต็มมักเจอแค่ฉบับตัวเอง
+ * จึงลองไล่ตามลำดับ: ชื่อเต็ม → segment ละตินนำหน้า → 5 คำแรก จนกว่าจะเจอ >1 ฉบับ
  */
+function titleQueryCandidates(title: string): string[] {
+  const trimmed = title.trim();
+  const candidates = [trimmed];
+
+  // ช่วงตัวอักษรละตินนำหน้า (ก่อนเจอตัวอักษรไทย/อื่น) เช่น "The seven year slip รักนี้..." → "The seven year slip"
+  const latin = trimmed
+    .match(/^[\x20-\x7E]+/)?.[0]
+    ?.trim()
+    ?.replace(/[\s\-–—:,;.!?]+$/, "")
+    .trim();
+  if (latin && latin.length >= 3 && latin.toLowerCase() !== trimmed.toLowerCase()) {
+    candidates.push(latin);
+  }
+
+  const firstWords = trimmed.split(/\s+/).slice(0, 5).join(" ");
+  if (!candidates.some((c) => c.toLowerCase() === firstWords.toLowerCase())) {
+    candidates.push(firstWords);
+  }
+
+  return candidates;
+}
+
 export async function fetchEditions(title: string): Promise<NormalizedBook[]> {
-  try {
+  const tryQuery = async (candidate: string): Promise<NormalizedBook[]> => {
     const url = new URL(BOOKS_API);
-    url.searchParams.set("q", `intitle:"${title}"`);
+    url.searchParams.set("q", `intitle:"${candidate}"`);
     url.searchParams.set("maxResults", "20");
     const key = process.env.GOOGLE_BOOKS_API_KEY;
     if (key) url.searchParams.set("key", key);
 
     const data = (await callGoogleBooks(url.toString())) as { items?: unknown[] };
     const items = Array.isArray(data.items) ? data.items : [];
-    const editions = items
-      .map(normalizeVolume)
-      .filter((b): b is NormalizedBook => b !== null);
 
     const year = (b: NormalizedBook): number =>
       Number(b.publishedDate?.slice(0, 4)) || Number.MAX_SAFE_INTEGER;
 
-    return editions.sort((a, b) => year(a) - year(b));
-  } catch {
-    return [];
+    return items
+      .map(normalizeVolume)
+      .filter((b): b is NormalizedBook => b !== null)
+      .sort((a, b) => year(a) - year(b));
+  };
+
+  let last: NormalizedBook[] = [];
+  for (const candidate of titleQueryCandidates(title)) {
+    try {
+      last = await tryQuery(candidate);
+      if (last.length > 1) return last;
+    } catch {
+      break; // API ล้ม — เลิกลองต่อ
+    }
   }
+  return last;
 }

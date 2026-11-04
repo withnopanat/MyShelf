@@ -197,6 +197,49 @@ describe("fetchEditions", () => {
   });
 });
 
+describe("fetchEditions fallback queries", () => {
+  it("ชื่อเต็ม(ไทยผสม)เจอ 1 ฉบับ → ลอง segment ละติน → ได้หลายฉบับ", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ items: [{ id: "th", volumeInfo: { title: "X ไทย", publishedDate: "2026" } }] }),
+        { status: 200 },
+      ),
+    );
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [
+            { id: "a", volumeInfo: { title: "A", publishedDate: "2020" } },
+            { id: "b", volumeInfo: { title: "B", publishedDate: "2023" } },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const editions = await fetchEditions("The seven year slip รักนี้เมื่อเจ็บปีที่แล้ว");
+    expect(editions).toHaveLength(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondUrl = new URL(fetchMock.mock.calls[1][0] as string);
+    expect(secondUrl.searchParams.get("q")).toBe('intitle:"The seven year slip"');
+  });
+
+  it("ชื่อละตินล้วนเจอหลายฉบับ → ยิงครั้งเดียวพอ", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [
+            { id: "a", volumeInfo: { title: "A" } },
+            { id: "b", volumeInfo: { title: "B" } },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    await fetchEditions("Harry Potter");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("searchBooks", () => {
   it("ค้นแบบ text ส่ง q ตรง ๆ และ normalize ผลลัพธ์", async () => {
     fetchMock.mockResolvedValueOnce(
