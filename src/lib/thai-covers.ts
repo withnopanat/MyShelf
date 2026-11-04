@@ -260,7 +260,7 @@ export async function scrapeThaiCover(
   const token = options.isbnlabToken ?? process.env.ISBNLAB_API_TOKEN;
   const isbnlab = await scrapeIsbnLab(input, token, options.isbnlabBase ?? "https://www.isbnlab.com");
   if (isbnlab && (isbnlab.coverUrl || isbnlab.description || isbnlab.pageCount)) {
-    return isbnlab;
+    return { ...isbnlab, coverUrl: isbnlab.coverUrl ?? "" };
   }
 
   for (const base of wooStores) {
