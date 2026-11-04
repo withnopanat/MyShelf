@@ -126,9 +126,11 @@ describe("enrichFromOtherEditions", () => {
   });
 
   it("ทุกฉบับไม่มีปก → ลองหาร้านไทย (WooCommerce) แล้วเอาปก+คำอธิบายไทยมาเติม", async () => {
-    // ครั้งที่ 1: enrich จากฉบับอื่น (ไม่เจอปก)
+    // ครั้งที่ 1-3: enrich จากฉบับอื่น (ชื่อเต็ม / segment ละติน / relevance — ไม่เจอปกเลย)
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
-    // ครั้งที่ 2: ร้านไทย (WooCommerce Store API)
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    // ครั้งที่ 4: ร้านไทย (WooCommerce Store API)
     fetchMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify([
@@ -146,13 +148,15 @@ describe("enrichFromOtherEditions", () => {
     expect(result.coverUrl).toBe("https://store.example/cover-300.png");
     // HTML tag และ numeric entity ต้องถูก strip หมด
     expect(result.description).toBe("เรื่องราว ความรัก ข้ามเวลา");
-    // URL ที่ยิงต้องเป็น WooCommerce Store API ค้นด้วย ISBN
-    const storeUrl = new URL(fetchMock.mock.calls[1][0] as string);
+    // URL ที่ยิงร้านไทยต้องเป็น WooCommerce Store API ค้นด้วย ISBN
+    const storeUrl = new URL(fetchMock.mock.calls[3][0] as string);
     expect(storeUrl.pathname).toContain("/wp-json/wc/store/v1/products");
     expect(storeUrl.searchParams.get("search")).toBe("9786162986864");
   });
 
   it("ร้านไทยก็ไม่มี → คืนข้อมูลเดิม ไม่ throw", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
     const result = await enrichFromOtherEditions({ ...baseBook });
@@ -285,6 +289,37 @@ describe("fetchEditions foreign-script fallback", () => {
     const editions = await fetchEditions("anything");
     expect(editions).toHaveLength(2);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("enrichFromOtherEditions thai-only title", () => {
+  it("ชื่อล้วนไทย ไม่มีปกจาก intitle → ค้น relevance เอาปกต้นฉบับมาใช้", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [{ id: "th", volumeInfo: { title: "อาชญากรรมกับการลงทัณฑ์" } }],
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [
+              { id: "noise", volumeInfo: { title: "หนังสือไทยเล่มอื่น", language: "th", imageLinks: { thumbnail: "https://x/n.jpg" } } },
+              { id: "en1", volumeInfo: { title: "Crime and Punishment", language: "en", imageLinks: { thumbnail: "http://books.google.com/en.jpg" } } },
+            ],
+          }),
+          { status: 200 },
+        ),
+      );
+
+    const result = await enrichFromOtherEditions({ ...baseBook, coverUrl: null, description: null, googleBooksId: "th", title: "อาชญากรรมกับการลงทัณฑ์", isbn13: null, isbn10: null });
+    expect(result.coverUrl).toBe("https://books.google.com/en.jpg");
+    expect(result.title).toBe("อาชญากรรมกับการลงทัณฑ์");
+    // ครั้งที่ 3-4 = ร้านไทย (ค้นด้วย ISBN แล้วตามด้วยชื่อ — คำอธิบายยังขาดหลังได้ปกจาก EN)
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });
 

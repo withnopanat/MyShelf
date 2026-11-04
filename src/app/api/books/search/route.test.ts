@@ -8,6 +8,8 @@ vi.mock("@/lib/google-books", async (importOriginal) => {
   return {
     ...actual,
     searchBooks: vi.fn(),
+    // กันยิง Google จริงออกนอกเครื่องตอนเทส route
+    enrichFromOtherEditions: vi.fn(async (b: unknown) => b),
     BooksApiError: class BooksApiError extends Error {
       status: number;
       constructor(msg: string, status: number) {

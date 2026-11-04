@@ -184,22 +184,42 @@ export async function enrichCover(isbn: string): Promise<string | null> {
 export async function enrichFromOtherEditions(nb: NormalizedBook): Promise<NormalizedBook> {
   if (nb.coverUrl && nb.description) return nb;
 
-  let data: { items?: unknown[] };
-  try {
+  const query = async (params: Record<string, string>): Promise<{ items?: unknown[] }> => {
     const url = new URL(BOOKS_API);
-    url.searchParams.set("q", `intitle:"${nb.title}"`);
-    url.searchParams.set("maxResults", "10");
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     const key = process.env.GOOGLE_BOOKS_API_KEY;
     if (key) url.searchParams.set("key", key);
-    data = (await callGoogleBooks(url.toString())) as { items?: unknown[] };
-  } catch {
-    return nb; // enrich ไม่สำเร็จ = ใช้ข้อมูลเดิม ไม่ throw
+    return (await callGoogleBooks(url.toString())) as { items?: unknown[] };
+  };
+  const toVolumes = (data: { items?: unknown[] }): NormalizedBook[] => {
+    const items = Array.isArray(data.items) ? data.items : [];
+    return items.map(normalizeVolume).filter((v): v is NormalizedBook => v !== null);
+  };
+
+  // ค้นด้วยชื่อเรื่องเป๊ะ ๆ ก่อน แล้วค่อยลองผ่อนเงื่อนไข (เหมือน fetchEditions)
+  let volumes: NormalizedBook[] = [];
+  for (const candidate of titleQueryCandidates(nb.title)) {
+    try {
+      volumes = toVolumes(await query({ q: `intitle:"${candidate}"`, maxResults: "10" }));
+      if (volumes.some((v) => v.coverUrl)) break;
+    } catch {
+      volumes = [];
+      break;
+    }
   }
 
-  const items = Array.isArray(data.items) ? data.items : [];
-  const volumes = items
-    .map(normalizeVolume)
-    .filter((v): v is NormalizedBook => v !== null);
+  // ชื่อล้วนไทย (หาต้นฉบับด้วยชื่อไม่ได้) → ค้น relevance แล้วรับเฉพาะฉบับชื่อต่างชุดที่มีปก
+  if (!volumes.some((v) => v.coverUrl)) {
+    try {
+      const foreign = toVolumes(await query({ q: nb.title, maxResults: "20" })).filter(
+        (v) => !!v.coverUrl && !/[\u0E00-\u0E7F]/.test(v.title),
+      );
+      if (foreign.length > 0) volumes = [...volumes, ...foreign];
+    } catch {
+      // ใช้ผลเดิม
+    }
+  }
+
   // เลือกฉบับที่มีปกเป็นอันดับแรก (ให้ฉบับภาษาอังกฤษน้ำหนักกว่าเล็กน้อย)
   const donor =
     volumes.find((v) => v.coverUrl && v.language === "en") ?? volumes.find((v) => v.coverUrl);
