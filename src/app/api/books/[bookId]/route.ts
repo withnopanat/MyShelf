@@ -2,17 +2,48 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUserId, UnauthorizedError } from "@/lib/session";
 
-/** แก้ metadata ของ manual book — เฉพาะเล่มที่ตัวเองสร้างเท่านั้น */
+function isValidCoverUrl(v: unknown): v is string {
+  return typeof v === "string" && /^https?:\/\/[\w.\-/%~?:&=+,#@!$'()*[\]]+$/i.test(v) && !v.startsWith("javascript:");
+}
+
+/**
+ * PATCH /api/books/[bookId]
+ * - coverUrl: เปลี่ยนได้ทุกเล่ม (ผู้ใช้ที่ล็อกอินอนุญาตแล้ว — allowlist) เช่น เลือกปกจากแกลเลอรีฉบับอื่น
+ * - title/authors/categories/isbn: แก้ได้เฉพาะ manual book ที่ตัวเองสร้าง
+ */
 export async function PATCH(request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   try {
     const userId = await requireUserId();
     const { bookId } = await params;
 
     const body = (await request.json().catch(() => null)) as
-      | { title?: unknown; authors?: unknown; categories?: unknown; isbn10?: unknown; isbn13?: unknown }
+      | { title?: unknown; authors?: unknown; categories?: unknown; isbn10?: unknown; isbn13?: unknown; coverUrl?: unknown }
       | null;
+    if (!body) {
+      return NextResponse.json({ error: "ข้อมูลไม่ถูกต้อง" }, { status: 400 });
+    }
 
-    if (!body || typeof body.title !== "string" || !body.title.trim()) {
+    const hasManualEdit =
+      body.title !== undefined || body.authors !== undefined || body.categories !== undefined || body.isbn10 !== undefined || body.isbn13 !== undefined;
+
+    // เปลี่ยนเฉพาะปก (ใช้ได้กับทุกเล่ม)
+    if (!hasManualEdit) {
+      if (!isValidCoverUrl(body.coverUrl)) {
+        return NextResponse.json({ error: "URL ปกไม่ถูกต้อง" }, { status: 400 });
+      }
+      const result = await prisma.book.updateMany({
+        where: { id: bookId },
+        data: { coverUrl: body.coverUrl },
+      });
+      if (result.count === 0) {
+        return NextResponse.json({ error: "ไม่พบหนังสือ" }, { status: 404 });
+      }
+      const book = await prisma.book.findUnique({ where: { id: bookId } });
+      return NextResponse.json({ book });
+    }
+
+    // แก้ metadata — manual book ของตัวเองเท่านั้น
+    if (typeof body.title !== "string" || !body.title.trim()) {
       return NextResponse.json({ error: "ต้องระบุชื่อหนังสือ" }, { status: 400 });
     }
 
@@ -28,6 +59,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ bo
           : undefined,
         isbn10: typeof body.isbn10 === "string" ? body.isbn10 : undefined,
         isbn13: typeof body.isbn13 === "string" ? body.isbn13 : undefined,
+        coverUrl: isValidCoverUrl(body.coverUrl) ? body.coverUrl : undefined,
       },
     });
 

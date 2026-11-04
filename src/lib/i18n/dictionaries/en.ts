@@ -73,6 +73,7 @@ export const en = {
     addTag: "Add tag...",
     close: "Close",
     otherEditions: "Other edition covers (by year)",
+    pickCover: "Click to use this cover",
   },
   common: {
     add: "Add",

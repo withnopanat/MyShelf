@@ -71,6 +71,7 @@ export const th = {
     addTag: "เพิ่มแท็ก...",
     close: "ปิด",
     otherEditions: "ปกฉบับอื่น (เรียงตามปี)",
+    pickCover: "กดเพื่อใช้ปกนี้",
   },
   common: {
     add: "เพิ่ม",

@@ -160,7 +160,21 @@ export function BookDetailModal({ item, open, onOpenChange, onItemChanged, onRem
         </div>
 
         <div>
-          <EditionCovers title={item.book.title} currentGoogleBooksId={item.book.googleBooksId} />
+          <EditionCovers
+          title={item.book.title}
+          currentGoogleBooksId={item.book.googleBooksId}
+          onPick={(coverUrl) => {
+            void (async () => {
+              try {
+                await apiPatch(`/api/books/${item.book.id}`, { coverUrl }, "errors.generic");
+                toast.success(t.common.saved);
+                onItemChanged?.();
+              } catch (error) {
+                toast.error(apiErrorMessage(error, t.errors));
+              }
+            })();
+          }}
+        />
 
         <p className="mb-1 text-xs font-medium text-muted-foreground">{t.detail.description}</p>
           <p className="text-sm leading-relaxed">
