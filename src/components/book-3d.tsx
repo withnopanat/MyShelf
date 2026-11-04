@@ -6,8 +6,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * หนังสือ 3D (CSS 3D): ปกหน้า + สันหนังสือ + ขอบกระดาษ
- * ความหนาคำนวณจากจำนวนหน้า (~0.11 มม./หน้า) สัดส่วนตัวเล่ม 13×19 ซม. มาตรฐานหนังสือไทย
+ * ความหนาคำนวณจากจำนวนหน้า (~0.12 มม./หน้า) สัดส่วนตัวเล่ม 13×19 ซม. มาตรฐานหนังสือไทย
  * เล่มที่ไม่รู้จำนวนหน้าใช้ความหนาค่าเริ่มต้น 20 มม.
+ * hover → หมุนตรงขึ้น (CSS var --book3d-angle-hover, transition ใน globals.css)
  */
 const SIZES = {
   sm: { w: 80, h: 116 }, // การ์ดบนชั้น
@@ -21,28 +22,40 @@ export function Book3D({
   coverUrl,
   pages,
   size = "sm",
+  rotationAngle = -20,
+  hoverAngle = -8,
   className,
 }: {
   title: string;
   coverUrl: string | null;
   pages?: number | null;
   size?: Book3DSize;
+  rotationAngle?: number;
+  hoverAngle?: number;
   className?: string;
 }) {
   const { w, h } = SIZES[size];
   const mmPerPx = w / 130; // กว้าง 130 มม.
-  const depth = Math.round(Math.min(Math.max((pages ?? 180) * 0.11, 9), 42) * mmPerPx);
+  const depth = Math.round(Math.min(Math.max((pages ?? 180) * 0.12, 10), 45) * mmPerPx);
   const gradientIdx = coverPlaceholder(title);
 
   return (
     <div
-      className={cn("relative select-none", className)}
+      className={cn("book3d-root relative select-none", className)}
       style={{ width: w, height: h, perspective: "900px" }}
       aria-label={`หนังสือ ${title}`}
     >
       <div
-        className="relative h-full w-full"
-        style={{ transformStyle: "preserve-3d", transform: "rotateY(-20deg)" }}
+        data-testid="book3d-inner"
+        className="book3d-inner relative h-full w-full"
+        style={
+          {
+            width: w,
+            height: h,
+            "--book3d-angle": `${rotationAngle}deg`,
+            "--book3d-angle-hover": `${hoverAngle}deg`,
+          } as React.CSSProperties
+        }
       >
         {/* ปกหน้า */}
         <div

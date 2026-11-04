@@ -52,6 +52,19 @@ body {
   font-family: var(--font-sans);
 }
 
+/* หนังสือ 3D — hover หมุนตรงขึ้น (มุมจาก CSS var ที่ component ตั้ง) */
+.book3d-inner {
+  transform: rotateY(var(--book3d-angle, -20deg));
+  transition: transform 500ms cubic-bezier(0.22, 0.68, 0.32, 1.08);
+}
+.book3d-root:hover .book3d-inner,
+.group:hover .book3d-inner {
+  transform: rotateY(var(--book3d-angle-hover, -8deg));
+}
+@media (prefers-reduced-motion: reduce) {
+  .book3d-inner { transition: none; }
+}
+
 :root {
   /* MyShelf palette — ครีมอ่อน / เทาเข้ม / sage */
   --background: oklch(0.966 0.008 95);
