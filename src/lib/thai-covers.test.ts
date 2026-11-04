@@ -1,6 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { scrapeThaiCover, clearSitemapCache } from "@/lib/thai-covers";
 
+const BOOK_JSON = {
+  "@context": "/api/contexts/Book",
+  "@type": "Book",
+  isbn13: "9786164788831",
+  title: "อาชญากรรมกับการลงทัณฑ์",
+  numberOfPages: 512,
+  description: "เรื่องราวของรัสโซลนิคอฟ",
+  publishers: [{ slug: "p1", name: "สำนักพิมพ์ไทย" }],
+  publishDate: "2018-01-01T00:00:00+00:00",
+  covers: ["https://covers.isbnlab.com/9786164788831.jpg"],
+  authors: [{ slug: "dostoevsky", name: "ฟโยดอร์ โดสโตเยฟสกี้" }],
+  subjects: [{ slug: "fiction", name: "Fiction" }],
+};
+
 const fetchMock = vi.fn();
 // stub ใน beforeEach — afterEach จะ unstub ทุก test (stub ระดับ module ใช้ได้แค่ test แรก)
 beforeEach(() => {
@@ -112,6 +126,44 @@ describe("sitemap store adapter — back cover", () => {
     const r = await scrapeThaiCover({ isbn13: "9786162222222", title: "โอลก้า" }, [], ["shop.x.com"]);
     expect(r?.coverUrl).toBe("https://cdn.x/front.jpg");
     expect(r?.backCoverUrl).toBe("https://cdn.x/back.jpg");
+  });
+});
+
+describe("isbnlab adapter", () => {
+  it("มี token → เรียก API แล้ว map เป็นปก/จำนวนหน้า/คำอธิบาย/สำนักพิมพ์", async () => {
+    router([
+      ["isbnlab.com/api/book", JSON.stringify(BOOK_JSON)],
+    ]);
+    const r = await scrapeThaiCover(
+      { isbn13: "9786164788831", title: "อาชญากรรมกับการลงทัณฑ์" },
+      [],
+      [],
+      { isbnlabToken: "tok123", isbnlabBase: "https://www.isbnlab.com" },
+    );
+    expect(r?.coverUrl).toBe("https://covers.isbnlab.com/9786164788831.jpg");
+    expect(r?.pageCount).toBe(512);
+    expect(r?.description).toBe("เรื่องราวของรัสโซลนิคอฟ");
+    expect(r?.publisher).toBe("สำนักพิมพ์ไทย");
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain("/api/book/isbn/9786164788831");
+    const headers = fetchMock.mock.calls[0][1].headers;
+    expect(headers.Authorization).toBe("Bearer tok123");
+  });
+
+  it("API 401 → ไปต่อ (คืน null เมื่อไม่มี store อื่น)", async () => {
+    fetchMock.mockImplementation(async () => new Response("unauthorized", { status: 401 }));
+    const r = await scrapeThaiCover(
+      { isbn13: "9786164788831", title: "x" },
+      [],
+      [],
+      { isbnlabToken: "bad", isbnlabBase: "https://www.isbnlab.com" },
+    );
+    expect(r).toBeNull();
+  });
+
+  it("ไม่มี token → ไม่ยิง fetch", async () => {
+    await scrapeThaiCover({ isbn13: "9786164788831", title: "x" }, [], [], {});
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

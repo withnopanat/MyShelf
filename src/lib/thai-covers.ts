@@ -176,20 +176,101 @@ async function scrapeSitemapStore(
   return match ? { coverUrl: match.coverUrl, backCoverUrl: match.backCoverUrl, pageCount: match.pageCount } : null;
 }
 
+// ── 3) ISBNLab JSON API (สาธารณะ, ใช้ Bearer token ฟรีจาก isbnlab.com) ──
+
+type IsbnLabBook = {
+  isbn13?: string;
+  title?: string;
+  numberOfPages?: number;
+  description?: string;
+  publishers?: Array<{ name?: string }>;
+  publishDate?: string;
+  covers?: string[];
+  authors?: Array<{ name?: string }>;
+  subjects?: Array<{ name?: string }>;
+};
+
+async function scrapeIsbnLab(
+  input: { isbn13?: string | null; title: string },
+  token: string | undefined,
+  base: string,
+): Promise<{
+  coverUrl: string | null;
+  backCoverUrl: string | null;
+  description: string | null;
+  pageCount: number | null;
+  publisher: string | null;
+  publishedDate: string | null;
+  authors: string[];
+  categories: string[];
+} | null> {
+  if (!token || !input.isbn13) return null;
+  let text: string;
+  try {
+    const res = await fetch(`${base}/api/book/isbn/${encodeURIComponent(input.isbn13)}`, {
+      headers: { "User-Agent": UA, Accept: "application/ld+json", Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null; // 401 = token ไม่ถูก, 404 = ไม่มีเล่ม
+    text = await res.text();
+  } catch {
+    return null;
+  }
+  let book: IsbnLabBook;
+  try {
+    book = JSON.parse(text) as IsbnLabBook;
+  } catch {
+    return null;
+  }
+
+  const covers = (book.covers ?? []).filter((c) => typeof c === "string" && !!c);
+  const description = book.description ? stripHtml(book.description) : null;
+  if (!covers.length && !description && !book.numberOfPages) return null;
+
+  return {
+    coverUrl: covers[0] ?? null,
+    backCoverUrl: covers[1] ?? null,
+    description: description || null,
+    pageCount: typeof book.numberOfPages === "number" ? book.numberOfPages : null,
+    publisher: book.publishers?.[0]?.name ?? null,
+    publishedDate: book.publishDate?.slice(0, 4) ?? null,
+    authors: (book.authors ?? []).map((a) => a.name).filter((n): n is string => !!n),
+    categories: (book.subjects ?? []).map((s) => s.name).filter((n): n is string => !!n),
+  };
+}
+
 // ── public ──────────────────────────────────────────────────────────
 
 export async function scrapeThaiCover(
   input: { isbn13?: string | null; title: string },
   wooStores: string[] = WOOCOMMERCE_STORES,
   sitemapStores: string[] = SITEMAP_STORES,
-): Promise<{ coverUrl: string; backCoverUrl: string | null; description: string | null; pageCount: number | null } | null> {
+  options: { isbnlabToken?: string; isbnlabBase?: string } = {},
+): Promise<{
+  coverUrl: string;
+  backCoverUrl: string | null;
+  description: string | null;
+  pageCount: number | null;
+  publisher: string | null;
+  publishedDate: string | null;
+  authors: string[];
+  categories: string[];
+} | null> {
+  // ISBNLab มาก่อน — เป็น JSON API มีโครงสร้างชัดและเร็วที่สุด
+  const token = options.isbnlabToken ?? process.env.ISBNLAB_API_TOKEN;
+  const isbnlab = await scrapeIsbnLab(input, token, options.isbnlabBase ?? "https://www.isbnlab.com");
+  if (isbnlab && (isbnlab.coverUrl || isbnlab.description || isbnlab.pageCount)) {
+    return isbnlab;
+  }
+
   for (const base of wooStores) {
     const r = await scrapeWooCommerce(base, input);
-    if (r) return { ...r, backCoverUrl: null };
+    if (r) return { ...r, backCoverUrl: null, publisher: null, publishedDate: null, authors: [], categories: [] };
   }
   for (const base of sitemapStores) {
     const r = await scrapeSitemapStore(base, input);
-    if (r) return { coverUrl: r.coverUrl, backCoverUrl: r.backCoverUrl, description: null, pageCount: r.pageCount };
+    if (r)
+      return { coverUrl: r.coverUrl, backCoverUrl: r.backCoverUrl, description: null, pageCount: r.pageCount, publisher: null, publishedDate: null, authors: [], categories: [] };
   }
   return null;
 }

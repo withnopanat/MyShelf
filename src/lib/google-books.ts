@@ -234,8 +234,8 @@ export async function enrichFromOtherEditions(nb: NormalizedBook): Promise<Norma
       }
     : nb;
 
-  // ยังขาดปกหรือคำอธิบาย → ลองร้านไทย (ปก+ปกหลัง+จำนวนหน้า+คำอธิบายจากร้านไทย)
-  if (!merged.coverUrl || !merged.description) {
+  // ยังขาดปก/คำอธิบาย/จำนวนหน้า → ลองร้านไทย + ISBNLab (ปก, ปกหลัง, จำนวนหน้า, metadata)
+  if (!merged.coverUrl || !merged.description || !merged.pageCount) {
     const thai = await scrapeThaiCover({ isbn13: nb.isbn13, title: nb.title });
     if (thai) {
       merged = {
@@ -244,6 +244,10 @@ export async function enrichFromOtherEditions(nb: NormalizedBook): Promise<Norma
         backCoverUrl: merged.backCoverUrl ?? thai.backCoverUrl ?? null,
         pageCount: merged.pageCount ?? thai.pageCount ?? null,
         description: merged.description ?? thai.description,
+        publisher: merged.publisher ?? thai.publisher ?? null,
+        publishedDate: merged.publishedDate ?? thai.publishedDate ?? null,
+        authors: merged.authors.length > 0 ? merged.authors : thai.authors,
+        categories: merged.categories.length > 0 ? merged.categories : thai.categories,
       };
     }
   }
