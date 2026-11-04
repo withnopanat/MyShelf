@@ -5,6 +5,7 @@ export const en = {
     home: "Home",
     search: "Search",
     shelf: "My Shelf",
+    catalog: "Store",
     signOut: "Sign out",
     themeLight: "Light",
     themeDark: "Dark",
@@ -62,6 +63,15 @@ export const en = {
     WANT_TO_READ: "Want to read",
     READING: "Reading",
     READ: "Read",
+  },
+  catalog: {
+    title: "Library House catalog",
+    sync: "Sync store",
+    syncing: "Syncing... (first run takes a while)",
+    syncDone: "Created {created} · Updated {updated}",
+    empty: "No store data yet",
+    emptyHint: "Press Sync store to import all books",
+    search: "Search catalog...",
   },
   detail: {
     description: "Description",

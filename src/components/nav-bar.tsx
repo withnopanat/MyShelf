@@ -43,6 +43,7 @@ export function NavBar({ user }: { user: { name?: string | null; image?: string 
     { href: "/", label: t.nav.home },
     { href: "/search", label: t.nav.search },
     { href: "/shelf", label: t.nav.shelf },
+    { href: "/catalog", label: t.nav.catalog },
   ];
 
   return (

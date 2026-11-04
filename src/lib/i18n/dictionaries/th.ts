@@ -3,6 +3,7 @@ export const th = {
     home: "หน้าหลัก",
     search: "ค้นหา",
     shelf: "ชั้นของฉัน",
+    catalog: "ร้านหนังสือ",
     signOut: "ออกจากระบบ",
     themeLight: "สว่าง",
     themeDark: "มืด",
@@ -61,6 +62,15 @@ export const th = {
     READING: "กำลังอ่าน",
     READ: "อ่านแล้ว",
   },
+  catalog: {
+    title: "คลัง Library House",
+    sync: "ดึงข้อมูลร้าน",
+    syncing: "กำลังดึงข้อมูล... (ครั้งแรกใช้เวลาประมาณหนึ่ง)",
+    syncDone: "เพิ่มใหม่ {created} เล่ม · อัปเดต {updated} เล่ม",
+    empty: "ยังไม่มีข้อมูลร้าน",
+    emptyHint: "กด ดึงข้อมูลร้าน เพื่อนำเข้าทุกเล่ม",
+    search: "ค้นเล่มในคลัง...",
+  },
   detail: {
     description: "คำอธิบาย",
     publisher: "สำนักพิมพ์",
@@ -106,6 +116,7 @@ export type Dict = {
   home: Record<keyof typeof th.home, string>;
   search: Record<keyof typeof th.search, string>;
   shelf: Record<keyof typeof th.shelf, string>;
+  catalog: Record<keyof typeof th.catalog, string>;
   status: { WANT_TO_READ: string; READING: string; READ: string };
   detail: Record<keyof typeof th.detail, string>;
   common: Record<keyof typeof th.common, string>;

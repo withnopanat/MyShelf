@@ -74,6 +74,7 @@ model Book {
   description     String?
   pageCount       Int?
   language        String?
+  source          String?     // แหล่งข้อมูล: "library-house" สำหรับเล่มจากคลังร้าน, null = Google Books/manual
   createdByUserId String?     // manual book เท่านั้น
   createdByUser   User?       @relation("CreatedBy", fields: [createdByUserId], references: [id])
   shelfItems      ShelfItem[]

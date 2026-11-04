@@ -15,7 +15,7 @@ export const SITEMAP_STORES = ["https://shop.libraryhousebangkok.com"];
 const CRAWL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CRAWL_CONCURRENCY = 8;
 
-type CatalogEntry = { title: string; coverUrl: string; backCoverUrl: string | null; isbn: string | null; pageCount: number | null };
+export type CatalogEntry = { title: string; coverUrl: string; backCoverUrl: string | null; isbn: string | null; pageCount: number | null; description: string | null };
 type SitemapStore = { base: string; entries: CatalogEntry[]; fetchedAt: number };
 const sitemapCache = new Map<string, SitemapStore>();
 
@@ -129,6 +129,7 @@ async function crawlSitemapStore(base: string): Promise<CatalogEntry[]> {
     // Library House ฝัง JSON ใน <product-main :product='{...}'> — images[] มีปกหลัง + description มีจำนวนหน้า
     let backCoverUrl: string | null = null;
     let pageCount: number | null = null;
+    let description: string | null = null;
     const productJson = page.match(/<product-main\s+:product='([^']+)'/i)?.[1];
     if (productJson) {
       try {
@@ -137,13 +138,15 @@ async function crawlSitemapStore(base: string): Promise<CatalogEntry[]> {
         ) as { images?: Array<{ image_url?: string }>; description?: string };
         const urls = (product.images ?? []).map((img) => img.image_url).filter((u): u is string => !!u);
         if (urls.length > 1) backCoverUrl = urls[1];
-        pageCount = parsePageCount(stripHtml(product.description ?? ""));
+        const rawDesc = stripHtml(product.description ?? "");
+        pageCount = parsePageCount(rawDesc);
+        description = rawDesc || null;
       } catch {
         // JSON พัง → ใช้ og:image อย่างเดียว
       }
     }
 
-    entries.push({ title, coverUrl: image, backCoverUrl, isbn, pageCount });
+    entries.push({ title, coverUrl: image, backCoverUrl, isbn, pageCount, description });
   }
 
   sitemapCache.set(base, { base, entries, fetchedAt: Date.now() });
@@ -240,6 +243,21 @@ async function scrapeIsbnLab(
 }
 
 // ── public ──────────────────────────────────────────────────────────
+
+/** คลังเต็มของร้าน (สำหรับ sync ทั้งร้าน) — ใช้ cache 7 วันเดียวกัน */
+export async function getFullCatalog(
+  sitemapStores: string[] = SITEMAP_STORES,
+): Promise<{ store: string; entries: CatalogEntry[] } | null> {
+  for (const base of sitemapStores) {
+    try {
+      const entries = await crawlSitemapStore(base);
+      if (entries.length > 0) return { store: base, entries };
+    } catch {
+      // ลองร้านถัดไป
+    }
+  }
+  return null;
+}
 
 export async function scrapeThaiCover(
   input: { isbn13?: string | null; title: string },
