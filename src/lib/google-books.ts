@@ -228,3 +228,31 @@ export async function enrichFromOtherEditions(nb: NormalizedBook): Promise<Norma
 
   return merged;
 }
+
+/**
+ * ดึง "ทุกฉบับพิมพ์" ของเรื่องเดียวกัน (ค้นด้วยชื่อเรื่อง)
+ * เรียงตามปีที่พิมพ์เก่า→ใหม่ ฉบับที่ไม่ระบุปีไปท้าย
+ * API ล้ม → คืน array ว่าง (เป็นฟีเจอร์เสริม ไม่ควรพังหน้ารายละเอียด)
+ */
+export async function fetchEditions(title: string): Promise<NormalizedBook[]> {
+  try {
+    const url = new URL(BOOKS_API);
+    url.searchParams.set("q", `intitle:"${title}"`);
+    url.searchParams.set("maxResults", "20");
+    const key = process.env.GOOGLE_BOOKS_API_KEY;
+    if (key) url.searchParams.set("key", key);
+
+    const data = (await callGoogleBooks(url.toString())) as { items?: unknown[] };
+    const items = Array.isArray(data.items) ? data.items : [];
+    const editions = items
+      .map(normalizeVolume)
+      .filter((b): b is NormalizedBook => b !== null);
+
+    const year = (b: NormalizedBook): number =>
+      Number(b.publishedDate?.slice(0, 4)) || Number.MAX_SAFE_INTEGER;
+
+    return editions.sort((a, b) => year(a) - year(b));
+  } catch {
+    return [];
+  }
+}

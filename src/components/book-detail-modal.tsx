@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookCover } from "@/components/book-cover";
 import { TagEditor } from "@/components/tag-editor";
+import { EditionCovers } from "@/components/edition-covers";
 import { updateShelfItem, apiPatch, type ShelfItem } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { apiErrorMessage } from "@/lib/api-error";
@@ -159,7 +160,9 @@ export function BookDetailModal({ item, open, onOpenChange, onItemChanged, onRem
         </div>
 
         <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">{t.detail.description}</p>
+          <EditionCovers title={item.book.title} currentGoogleBooksId={item.book.googleBooksId} />
+
+        <p className="mb-1 text-xs font-medium text-muted-foreground">{t.detail.description}</p>
           <p className="text-sm leading-relaxed">
             {item.book.description ?? t.detail.noDescription}
           </p>

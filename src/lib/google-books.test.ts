@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { normalizeIsbn, isbn10To13, normalizeVolume, searchBooks, enrichFromOtherEditions, BooksApiError, type NormalizedBook } from "@/lib/google-books";
+import { normalizeIsbn, isbn10To13, normalizeVolume, searchBooks, enrichFromOtherEditions, fetchEditions, BooksApiError, type NormalizedBook } from "@/lib/google-books";
 import fixture from "@/lib/__fixtures__/google-volume.json";
 
 const fetchMock = vi.fn();
@@ -165,6 +165,35 @@ describe("enrichFromOtherEditions", () => {
     fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
     const result = await enrichFromOtherEditions({ ...baseBook });
     expect(result.coverUrl).toBeNull();
+  });
+});
+
+describe("fetchEditions", () => {
+  it("ค้นด้วย intitle แล้วเรียงฉบับตามปีเก่า→ใหม่ ฉบับไม่มีปีไปท้าย", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [
+            { id: "d", volumeInfo: { title: "X", publishedDate: "2020" } },
+            { id: "a", volumeInfo: { title: "X (ไทย)", publishedDate: "2018" } },
+            { id: "c", volumeInfo: { title: "X", publishedDate: "2023-06-13" } },
+            { id: "b", volumeInfo: { title: "X" } },
+            { volumeInfo: { title: "bad" } }, // normalize ไม่ผ่าน (ไม่มี id)
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const editions = await fetchEditions("The seven year slip รักนี้เมื่อเจ็บปีที่แล้ว");
+    expect(editions.map((e) => e.googleBooksId)).toEqual(["a", "d", "c", "b"]);
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.searchParams.get("q")).toBe('intitle:"The seven year slip รักนี้เมื่อเจ็บปีที่แล้ว"');
+  });
+
+  it("API ล้ม → คืน array ว่าง (ไม่ throw)", async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    const editions = await fetchEditions("anything");
+    expect(editions).toEqual([]);
   });
 });
 

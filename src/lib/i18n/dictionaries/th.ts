@@ -70,6 +70,7 @@ export const th = {
     noDescription: "ไม่มีคำอธิบาย",
     addTag: "เพิ่มแท็ก...",
     close: "ปิด",
+    otherEditions: "ปกฉบับอื่น (เรียงตามปี)",
   },
   common: {
     add: "เพิ่ม",
