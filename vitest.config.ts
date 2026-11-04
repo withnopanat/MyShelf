@@ -8,6 +8,7 @@ export default defineConfig({
     },
   },
   test: {
+    globals: true, // ให้ @testing-library/react auto-cleanup ระหว่าง test
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });

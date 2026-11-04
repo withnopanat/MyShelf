@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -33,7 +34,6 @@ export function SearchClient() {
   const [searched, setSearched] = useState(false);
   const [detailBook, setDetailBook] = useState<NormalizedBook | null>(null);
   const [shelfStatuses, setShelfStatuses] = useState<Map<string, BookStatus>>(new Map());
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // เช็กว่าเล่มไหนอยู่บนชั้นแล้ว (สเกลเล็ก — โหลดชั้นทั้งหมดครั้งเดียว)
   useEffect(() => {
@@ -48,39 +48,40 @@ export function SearchClient() {
       .catch(() => undefined);
   }, []);
 
-  const runSearch = useMemo(
-    () => async (q: string, searchType: string) => {
-      if (!q.trim()) {
-        setResults([]);
-        setSearched(false);
-        return;
-      }
-      setLoading(true);
-      try {
-        const books = await searchBooksClient(q.trim(), searchType);
-        setResults(books);
-        setSearched(true);
-      } catch (error) {
-        setResults([]);
-        setSearched(true);
-        import("sonner").then(({ toast }) =>
-          toast.error(apiErrorMessage(error, t.errors)),
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [t.errors.searchFailed],
-  );
+  const runSearch = async (q: string, searchType: string) => {
+    if (!q.trim()) {
+      setResults([]);
+      setSearched(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const books = await searchBooksClient(q.trim(), searchType);
+      setResults(books);
+      setSearched(true);
+    } catch (error) {
+      setResults([]);
+      setSearched(true);
+      import("sonner").then(({ toast }) =>
+        toast.error(apiErrorMessage(error, t.errors)),
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // debounce 400ms ตามแผน
+  // มาจากหน้าสแกน (?q= ใน URL) → ค้นให้เลยครั้งเดียวตอนเปิดหน้า
+  const initialQuery = searchParams.get("q");
+  const initialType = searchParams.get("type") ?? "text";
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => runSearch(query, type), 400);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query, type, runSearch]);
+    if (initialQuery) void runSearch(initialQuery, initialType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    void runSearch(query, type);
+  };
 
   const typeLabels: Record<string, string> = {
     text: t.search.typeAll,
@@ -91,7 +92,7 @@ export function SearchClient() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <form onSubmit={submitSearch} className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -113,7 +114,8 @@ export function SearchClient() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+        <Button type="submit">{t.search.searchButton}</Button>
+      </form>
 
       <div className="mt-6">
         {loading ? (
